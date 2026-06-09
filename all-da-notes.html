@@ -48,11 +48,14 @@
   .col-head button{width:22px;height:22px;border:none;border-radius:6px;background:transparent;color:var(--muted);font-size:16px;cursor:pointer;line-height:1;}
   .col-head button:hover{background:var(--accent-soft);color:var(--accent);}
   .list{overflow-y:auto;flex:1 1 0;min-height:0;padding:2px 8px;}
-  .item{padding:8px 10px;border-radius:8px;font-size:13px;cursor:pointer;margin-bottom:2px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .item{padding:8px 10px;border-radius:8px;font-size:13px;cursor:pointer;margin-bottom:2px;display:flex;align-items:center;gap:8px;}
   .item:hover{background:var(--accent-soft);}
   .item.selected{background:var(--sel);color:var(--accent);font-weight:600;}
   .item .menu{opacity:0;border:none;background:transparent;cursor:pointer;font-size:13px;color:inherit;}
   .item:hover .menu{opacity:.7;}
+  .item .label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .item .nb-color{width:13px;height:13px;border-radius:50%;flex:0 0 auto;cursor:pointer;border:1px solid rgba(0,0,0,.2);padding:0;}
+  .item .sec-pipe{flex:0 0 auto;cursor:pointer;font-weight:900;font-size:15px;line-height:1;background:none;border:none;padding:0;}
 
   .titlebar{padding:14px 22px 6px;background:var(--panel);}
   #pageTitle{width:100%;font-size:22px;font-weight:700;border:none;background:transparent;color:var(--ink);outline:none;}
@@ -61,6 +64,11 @@
   .toolbar button{min-width:32px;height:30px;padding:0 8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;cursor:pointer;font-size:13px;}
   .toolbar button:hover{border-color:var(--accent);color:var(--accent);}
   .toolbar input[type=color]{width:30px;height:30px;padding:0;border:1px solid var(--line);border-radius:8px;cursor:pointer;background:var(--panel);}
+  .toolbar .sepv{width:1px;height:20px;background:var(--line);margin:0 3px;}
+  .toolbar .clr{position:relative;font-weight:700;}
+  .toolbar .clr .ubar{position:absolute;left:6px;right:6px;bottom:4px;height:3px;border-radius:2px;background:#e23b53;}
+  .toolbar .clr .hlmark{background:#f2e06a;border-radius:2px;padding:0 3px;color:#1f2430;}
+  .toolbar button svg{display:block;}
 
   /* canvas: own scroll, content cannot escape to the page body (Bug #1 structural fix) */
   .canvasWrap{flex:1 1 0;min-height:0;overflow:auto;}
@@ -102,6 +110,11 @@
   .block .annotate [data-draw].active{background:var(--accent-soft);border-color:var(--accent);}
   .block .annotate .sw{border-radius:50%;}
 
+  .palette{position:fixed;z-index:30;display:none;grid-template-columns:repeat(6,1fr);gap:6px;padding:8px;
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-lg);}
+  .palette .swatch{width:22px;height:22px;border-radius:6px;border:2px solid #fff;box-shadow:0 0 0 1px var(--line);cursor:pointer;padding:0;}
+  .palette .swatch.current{outline:2px solid var(--ink);outline-offset:1px;}
+  .palette .swatch.disabled{opacity:.28;cursor:not-allowed;}
   #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#323130;color:#fff;padding:9px 15px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;box-shadow:var(--shadow-lg);}
   #toast.show{opacity:1;}
   #test-output{display:none;white-space:pre-wrap;font-family:Consolas,monospace;font-size:13px;padding:16px;}
@@ -141,13 +154,23 @@
           <button data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
           <button data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
           <button data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+          <span class="sepv"></span>
           <button data-block="H1" title="Heading 1">H1</button>
           <button data-block="H2" title="Heading 2">H2</button>
           <button data-block="P" title="Normal text">¶</button>
+          <span class="sepv"></span>
           <button data-cmd="insertUnorderedList" title="Bulleted list">•</button>
           <button data-cmd="insertOrderedList" title="Numbered list">1.</button>
-          <input type="color" id="foreColor" title="Text color" value="#c00000">
-          <input type="color" id="hiliteColor" title="Highlight" value="#ffff00">
+          <span class="sepv"></span>
+          <button data-cmd="justifyLeft" title="Align left"><svg width="14" height="14" viewBox="0 0 14 14"><g stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="1" y1="3" x2="13" y2="3"/><line x1="1" y1="7" x2="9" y2="7"/><line x1="1" y1="11" x2="13" y2="11"/></g></svg></button>
+          <button data-cmd="justifyCenter" title="Align centre"><svg width="14" height="14" viewBox="0 0 14 14"><g stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="1" y1="3" x2="13" y2="3"/><line x1="3" y1="7" x2="11" y2="7"/><line x1="1" y1="11" x2="13" y2="11"/></g></svg></button>
+          <button data-cmd="justifyRight" title="Align right"><svg width="14" height="14" viewBox="0 0 14 14"><g stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="1" y1="3" x2="13" y2="3"/><line x1="5" y1="7" x2="13" y2="7"/><line x1="1" y1="11" x2="13" y2="11"/></g></svg></button>
+          <span class="sepv"></span>
+          <button data-cmd="undo" title="Undo">↶</button>
+          <button data-cmd="redo" title="Redo">↷</button>
+          <span class="sepv"></span>
+          <button id="foreColorBtn" class="clr" title="Text colour">A<i class="ubar"></i></button>
+          <button id="hiliteColorBtn" class="clr" title="Highlight"><span class="hlmark">A</span></button>
         </div>
         <div class="canvasWrap" id="canvasWrap">
           <div class="page disabled" id="canvas"></div>
@@ -162,7 +185,7 @@
 "use strict";
 
 // ===== VERSION / UPDATE CHECK =====
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.2.0";
 // Points at the VERSION file in the GitHub repo (raw). NOTE: raw.githubusercontent.com
 // only serves this without auth if the repo is PUBLIC; for a private repo the fetch 404s
 // and the footer shows "Unable to check for updates". Leave empty to disable the check.
@@ -277,7 +300,8 @@ function pagePath(nbSlug, secSlug, pgSlug) {
 }
 function addNotebook(index, title) {
   const slug = uniqueSlug(slugify(title), index.notebooks.map(n => n.slug));
-  const nb = { id: genId("nb"), title: title, slug: slug, order: index.notebooks.length, sections: [] };
+  const color = nextNotebookColor(index.notebooks.map(n => n.color).filter(Boolean));
+  const nb = { id: genId("nb"), title: title, slug: slug, order: index.notebooks.length, color: color, sections: [] };
   index.notebooks.push(nb);
   return nb;
 }
@@ -285,7 +309,7 @@ function addSection(index, notebookId, title) {
   const nb = findNotebook(index, notebookId);
   if (!nb) throw new Error("notebook not found: " + notebookId);
   const slug = uniqueSlug(slugify(title), nb.sections.map(s => s.slug));
-  const sec = { id: genId("sec"), title: title, slug: slug, order: nb.sections.length, pages: [] };
+  const sec = { id: genId("sec"), title: title, slug: slug, order: nb.sections.length, color: DEFAULT_SECTION_COLOR, pages: [] };
   nb.sections.push(sec);
   return sec;
 }
@@ -400,6 +424,87 @@ function pageMatches(title, html, query) {
   return String(title || "").toLowerCase().indexOf(q) !== -1 ||
          pageText(html).toLowerCase().indexOf(q) !== -1;
 }
+
+// ===== COLORS =====
+const PALETTE = ["#e23b53","#e8833a","#f2b71e","#34a853","#2f9e8f","#2f8fed",
+                 "#6750f2","#a05df0","#e0699f","#9b6a44","#5b6b7b","#2b3440"];
+const DEFAULT_SECTION_COLOR = "#5b6b7b";
+
+function nextNotebookColor(taken) {
+  const set = new Set(taken);
+  for (const c of PALETTE) if (!set.has(c)) return c;
+  return PALETTE[0]; // palette exhausted -> best effort (uniqueness not guaranteed > 12)
+}
+function notebookColorTaken(index, color, exceptId) {
+  return index.notebooks.some(n => n.id !== exceptId && n.color === color);
+}
+function setNotebookColor(index, id, color) {
+  const nb = findNotebook(index, id);
+  if (!nb) throw new Error("notebook not found: " + id);
+  if (notebookColorTaken(index, color, id)) return false;
+  nb.color = color;
+  return true;
+}
+function setSectionColor(index, notebookId, id, color) {
+  const sec = findSection(index, notebookId, id);
+  if (!sec) throw new Error("section not found: " + id);
+  sec.color = color;
+  return true;
+}
+function ensureColors(index) {
+  let changed = false;
+  for (const nb of index.notebooks) {
+    if (!nb.color) {
+      const taken = index.notebooks.filter(n => n !== nb).map(n => n.color).filter(Boolean);
+      nb.color = nextNotebookColor(taken);
+      changed = true;
+    }
+  }
+  for (const nb of index.notebooks)
+    for (const sec of nb.sections)
+      if (!sec.color) { sec.color = DEFAULT_SECTION_COLOR; changed = true; }
+  return changed;
+}
+
+// ===== PALETTE UI =====
+const Palette = {
+  el: null,
+  _anchor: null,
+  init() {
+    if (Palette.el) return;
+    const el = document.createElement("div");
+    el.className = "palette";
+    document.body.appendChild(el);
+    Palette.el = el;
+    document.addEventListener("pointerdown", e => {
+      if (Palette.el.style.display === "grid" && !Palette.el.contains(e.target) &&
+          !(Palette._anchor && Palette._anchor.contains(e.target)))
+        Palette.close();
+    });
+    document.addEventListener("keydown", e => { if (e.key === "Escape") Palette.close(); });
+  },
+  open(anchorEl, current, disabledSet, onPick) {
+    Palette.init();
+    Palette._anchor = anchorEl;
+    const dis = disabledSet || new Set();
+    Palette.el.innerHTML = "";
+    PALETTE.forEach(c => {
+      const sw = document.createElement("button");
+      sw.className = "swatch" + (c === current ? " current" : "") + (dis.has(c) ? " disabled" : "");
+      sw.style.background = c;
+      sw.title = c;
+      sw.addEventListener("mousedown", e => e.preventDefault()); // keep editor selection
+      if (!dis.has(c)) sw.addEventListener("click", e => { e.stopPropagation(); Palette.close(); onPick(c); });
+      Palette.el.appendChild(sw);
+    });
+    const r = anchorEl.getBoundingClientRect();
+    Palette.el.style.display = "grid";
+    const w = Palette.el.offsetWidth || 180;
+    Palette.el.style.left = Math.max(6, Math.min(r.left, window.innerWidth - w - 6)) + "px";
+    Palette.el.style.top = (r.bottom + 4) + "px";
+  },
+  close() { if (Palette.el) Palette.el.style.display = "none"; Palette._anchor = null; }
+};
 
 // ===== BLOCKS =====
 function serializePage(blocks) {
@@ -1006,10 +1111,12 @@ const Editor = {
       btn.addEventListener("mousedown", e => e.preventDefault());
       btn.addEventListener("click", () => Editor.exec("formatBlock", "<" + btn.getAttribute("data-block").toLowerCase() + ">"));
     });
-    const fore = document.getElementById("foreColor");
-    fore.addEventListener("change", () => Editor.exec("foreColor", fore.value));
-    const hil = document.getElementById("hiliteColor");
-    hil.addEventListener("change", () => Editor.exec("hiliteColor", hil.value));
+    const foreBtn = document.getElementById("foreColorBtn");
+    foreBtn.addEventListener("mousedown", e => e.preventDefault());
+    foreBtn.addEventListener("click", () => Palette.open(foreBtn, null, null, hex => Editor.exec("foreColor", hex)));
+    const hilBtn = document.getElementById("hiliteColorBtn");
+    hilBtn.addEventListener("mousedown", e => e.preventDefault());
+    hilBtn.addEventListener("click", () => Palette.open(hilBtn, null, null, hex => Editor.exec("hiliteColor", hex)));
   }
 };
 
@@ -1021,17 +1128,26 @@ const View = {
     View._renderPages(app);
     View._renderEditorHeader(app);
   },
-  _list(el, items, selectedId, onSelect, onRename, onDelete) {
+  _list(el, items, selectedId, onSelect, onRename, onDelete, colorControl) {
     el.innerHTML = "";
     for (const it of items) {
       const row = document.createElement("div");
       row.className = "item" + (it.id === selectedId ? " selected" : "");
+      if (colorControl) {
+        const cc = document.createElement("button");
+        if (colorControl.shape === "pipe") { cc.className = "sec-pipe"; cc.textContent = "|"; cc.style.color = it.color || ""; }
+        else { cc.className = "nb-color"; cc.style.background = it.color || ""; }
+        cc.title = "Change colour";
+        cc.addEventListener("click", e => { e.stopPropagation(); colorControl.open(it, cc); });
+        row.appendChild(cc);
+      }
       const label = document.createElement("span");
+      label.className = "label";
       label.textContent = it.title;
       const menu = document.createElement("button");
       menu.className = "menu"; menu.textContent = "⋯"; menu.title = "Rename / Delete";
       row.appendChild(label); row.appendChild(menu);
-      row.addEventListener("click", e => { if (e.target !== menu) onSelect(it.id); });
+      row.addEventListener("click", e => { if (e.target !== menu && e.target.className !== "nb-color" && e.target.className !== "sec-pipe") onSelect(it.id); });
       menu.addEventListener("click", e => {
         e.stopPropagation();
         const action = window.prompt('Type "r" to rename or "d" to delete "' + it.title + '"', "r");
@@ -1047,12 +1163,17 @@ const View = {
   },
   _renderNotebooks(app) {
     View._list(document.getElementById("nbList"), app.index.notebooks, app.sel.notebookId,
-      id => app.selectNotebook(id), (id, n) => app.renameNotebookUI(id, n), id => app.deleteNotebookUI(id));
+      id => app.selectNotebook(id), (id, n) => app.renameNotebookUI(id, n), id => app.deleteNotebookUI(id),
+      { shape: "icon", open: (it, anchor) => Palette.open(anchor, it.color,
+          new Set(app.index.notebooks.filter(n => n.id !== it.id).map(n => n.color)),
+          hex => app.setNotebookColorUI(it.id, hex)) });
   },
   _renderSections(app) {
     const nb = findNotebook(app.index, app.sel.notebookId);
     View._list(document.getElementById("secList"), nb ? nb.sections : [], app.sel.sectionId,
-      id => app.selectSection(id), (id, n) => app.renameSectionUI(id, n), id => app.deleteSectionUI(id));
+      id => app.selectSection(id), (id, n) => app.renameSectionUI(id, n), id => app.deleteSectionUI(id),
+      { shape: "pipe", open: (it, anchor) => Palette.open(anchor, it.color, null,
+          hex => app.setSectionColorUI(it.id, hex)) });
   },
   _renderPages(app) {
     const el = document.getElementById("pageList");
@@ -1078,6 +1199,7 @@ const App = {
   async init() {
     document.getElementById("appVersion").textContent = "v" + APP_VERSION;
     App.checkForUpdates();   // fire-and-forget; shows status in the nav footer
+    Palette.init();
     if (!Storage.supported()) {
       App.showBanner("This app needs the File System Access API. Please open it in Google Chrome or Microsoft Edge.");
       document.getElementById("openBtn").disabled = true;
@@ -1155,6 +1277,7 @@ const App = {
       await Storage.writeIndex(handle, idx);
     }
     App.index = idx;
+    if (ensureColors(App.index)) await App.persistIndex();   // backfill colours for old folders
     App.sel = { notebookId: null, sectionId: null, pageId: null };
     // Auto-select first notebook/section/page if present.
     const nb = idx.notebooks[0];
@@ -1324,6 +1447,17 @@ App.onTitleEdit = function () {
 App.requireRoot = function () {
   if (!App.root) { App.toast("Open a notes folder first"); return false; }
   return true;
+};
+
+App.setNotebookColorUI = async function (id, hex) {
+  if (!setNotebookColor(App.index, id, hex)) { App.toast("That colour is already used by another notebook"); return; }
+  await App.persistIndex();
+  View.render(App);
+};
+App.setSectionColorUI = async function (id, hex) {
+  setSectionColor(App.index, App.sel.notebookId, id, hex);
+  await App.persistIndex();
+  View.render(App);
 };
 
 // ---- cross-content search (title + page text), jump-to-match with counter ----
@@ -1814,6 +1948,62 @@ test("rectsOverlap false when edges touch", () =>
   assert(rectsOverlap({x:0,y:0,w:50,h:50}, {x:50,y:0,w:50,h:50}) === false));
 test("rectsOverlap true when nested", () =>
   assert(rectsOverlap({x:0,y:0,w:200,h:200}, {x:20,y:20,w:30,h:30}) === true));
+
+test("nextNotebookColor returns first palette colour when none taken", () =>
+  assertEqual(nextNotebookColor([]), PALETTE[0]));
+test("nextNotebookColor skips taken colours", () =>
+  assertEqual(nextNotebookColor([PALETTE[0], PALETTE[1]]), PALETTE[2]));
+test("nextNotebookColor falls back to first when all taken", () =>
+  assertEqual(nextNotebookColor(PALETTE.slice()), PALETTE[0]));
+test("notebookColorTaken true for another notebook, false for self/none", () => {
+  const idx = { version:1, notebooks:[{id:"a",color:"#111"},{id:"b",color:"#222"}] };
+  assert(notebookColorTaken(idx, "#222", "a") === true);
+  assert(notebookColorTaken(idx, "#222", "b") === false); // owned by self
+  assert(notebookColorTaken(idx, "#333", "a") === false);
+});
+test("setNotebookColor sets a free colour and returns true", () => {
+  const idx = emptyIndex(); const nb = addNotebook(idx, "W");
+  assert(setNotebookColor(idx, nb.id, "#abcdef") === true);
+  assertEqual(nb.color, "#abcdef");
+});
+test("setNotebookColor rejects a colour owned by another notebook", () => {
+  const idx = emptyIndex(); const a = addNotebook(idx, "A"); const b = addNotebook(idx, "B");
+  setNotebookColor(idx, a.id, "#abcdef");
+  const before = b.color;
+  assert(setNotebookColor(idx, b.id, "#abcdef") === false);
+  assertEqual(b.color, before); // unchanged
+});
+test("setNotebookColor allows setting a notebook to its own colour", () => {
+  const idx = emptyIndex(); const a = addNotebook(idx, "A");
+  setNotebookColor(idx, a.id, "#abcdef");
+  assert(setNotebookColor(idx, a.id, "#abcdef") === true);
+});
+test("setSectionColor sets the section colour", () => {
+  const idx = emptyIndex(); const nb = addNotebook(idx, "W"); const sec = addSection(idx, nb.id, "S");
+  assert(setSectionColor(idx, nb.id, sec.id, "#123456") === true);
+  assertEqual(sec.color, "#123456");
+});
+test("ensureColors fills missing colours uniquely and reports change", () => {
+  const idx = { version:1, notebooks:[
+    { id:"n1", sections:[{ id:"s1", pages:[] }] },
+    { id:"n2", color:"#fixed", sections:[] }
+  ]};
+  assert(ensureColors(idx) === true);
+  assert(typeof idx.notebooks[0].color === "string" && idx.notebooks[0].color !== "#fixed");
+  assertEqual(idx.notebooks[1].color, "#fixed");          // existing untouched
+  assertEqual(idx.notebooks[0].sections[0].color, DEFAULT_SECTION_COLOR);
+  assert(ensureColors(idx) === false);                    // nothing left to change
+});
+test("addNotebook assigns a unique palette colour", () => {
+  const idx = emptyIndex(); const a = addNotebook(idx, "A"); const b = addNotebook(idx, "B");
+  assert(PALETTE.indexOf(a.color) !== -1, a.color);
+  assert(PALETTE.indexOf(b.color) !== -1, b.color);
+  assert(a.color !== b.color);
+});
+test("addSection assigns the default section colour", () => {
+  const idx = emptyIndex(); const nb = addNotebook(idx, "W"); const sec = addSection(idx, nb.id, "S");
+  assertEqual(sec.color, DEFAULT_SECTION_COLOR);
+});
 
 function runTests() {
   let pass = 0, fail = 0; const lines = [];
