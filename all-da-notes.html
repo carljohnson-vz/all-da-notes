@@ -165,7 +165,7 @@
 const APP_VERSION = "1.1.0";
 // Points at the VERSION file in the GitHub repo (raw). NOTE: raw.githubusercontent.com
 // only serves this without auth if the repo is PUBLIC; for a private repo the fetch 404s
-// and the footer shows "Update check unavailable". Leave empty to disable the check.
+// and the footer shows "Unable to check for updates". Leave empty to disable the check.
 const UPDATE_CHECK_URL = "https://raw.githubusercontent.com/carljohnson-vz/all-da-notes/main/VERSION";
 
 // Extract a dotted version (e.g. "1.2.3") from raw text or a releases JSON payload.
@@ -1422,10 +1422,10 @@ App.checkForUpdates = async function () {
     const resp = await fetch(UPDATE_CHECK_URL, { cache: "no-store" });
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const latest = parseLatestVersion(await resp.text());
-    if (!latest) { el.textContent = "Update check unavailable"; return; }
+    if (!latest) { el.textContent = "Unable to check for updates"; return; }
     el.textContent = compareVersions(latest, APP_VERSION) > 0 ? "Not running latest version" : "Up To Date";
   } catch (e) {
-    el.textContent = "Update check unavailable";
+    el.textContent = "Unable to check for updates";
   }
 };
 
