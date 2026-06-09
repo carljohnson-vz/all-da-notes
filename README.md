@@ -6,6 +6,13 @@ folder on your own drive. No install, no build step, no server required, no acco
 > Chromium browsers only (Google Chrome or Microsoft Edge) — it uses the File System
 > Access API to read and write your notes folder.
 
+## Download & run
+
+1. Go to the [**Releases page**](https://github.com/carljohnson-vz/all-da-notes/releases/) and download the latest **`all-da-notes.html`** (if you downloaded a `.zip`, extract it first).
+2. Open it in Google Chrome or Microsoft Edge.
+
+That's it — no install, no setup, nothing to build.
+
 ## Features
 
 - **Notebooks → Sections → Pages** with a navigation sidebar.
