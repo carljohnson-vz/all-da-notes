@@ -24,15 +24,10 @@ folder on your own drive. No install, no build step, no server required, no acco
 
 ## Running it
 
-**Option A — double-click**
-Open `all-da-notes.html` in Chrome or Edge. Click **Open notes folder** and pick a folder.
-Note: opened directly as a `file://` page, the browser may ask you to re-pick the folder
-after a reload (a security restriction).
-
-**Option B — local server (recommended for reliable "reopen where you left off")**
-Double-click **`start.cmd`** (Windows, requires Python). It serves the app at
-`http://localhost:8765/all-da-notes.html` and opens your browser. On `localhost` the app
-reliably restores your last folder with no clicks.
+Open `all-da-notes.html` in Chrome or Edge, click **Open notes folder**, and pick a folder.
+Your notes are saved there automatically and restored next time you open the app. Note:
+opened directly as a `file://` page, the browser may ask you to re-pick the folder after a
+reload (a security restriction).
 
 ## Where your notes live
 
