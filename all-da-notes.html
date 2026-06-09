@@ -1,0 +1,1842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>All Da Notes</title>
+<style>
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;font-family:"Segoe UI",system-ui,sans-serif;}
+  body{
+    display:flex;flex-direction:column;
+    --bg:#eef0f6; --panel:#fff; --panel2:#f7f8fc; --ink:#1f2430; --muted:#6b7280;
+    --line:#e4e7ef; --accent:#6750f2; --accent-soft:#ece9ff; --sel:#e9e6ff;
+    --shadow:0 1px 3px rgba(20,20,40,.08); --shadow-lg:0 10px 30px rgba(20,20,40,.18);
+    --radius:12px; --canvas:#f3f4fa; --grid:#e3e5ef;
+    background:var(--bg);color:var(--ink);
+  }
+  /* The #app wrapper must continue the flex column so .panes can fill the viewport;
+     without this it collapses to content height and growing content pushes the nav down. */
+  #app{display:flex;flex-direction:column;height:100%;min-height:0;}
+  .topbar{display:flex;align-items:center;gap:14px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);}
+  .logo{width:24px;height:24px;border-radius:7px;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;}
+  .topbar h1{font-size:15px;margin:0;font-weight:650;}
+  .brand{display:flex;flex-direction:column;line-height:1.15;}
+  .version{font-size:13px;color:var(--muted);}
+  .update-status{padding:8px 14px;font-size:13px;color:var(--muted);border-top:1px solid var(--line);}
+  .searchbox{position:relative;flex:0 0 260px;}
+  .search{width:100%;padding:8px 46px 8px 32px;border:1px solid var(--line);border-radius:9px;color:var(--ink);font-size:13px;
+    background:var(--panel2) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%239aa' stroke-width='2'><circle cx='7' cy='7' r='5'/><path d='M11 11l4 4'/></svg>") 9px 50% no-repeat;}
+  .search:disabled{opacity:.5;}
+  .search-count{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--muted);pointer-events:none;}
+  ::highlight(search-hl){background:#ffe08a;color:#1f2430;}
+  .spacer{flex:1;}
+  .status{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);}
+  .status .dot{width:8px;height:8px;border-radius:50%;background:#9aa;}
+  .status.saved .dot{background:#34a853;} .status.saving .dot{background:#f5a623;} .status.unsaved .dot{background:#e0697a;}
+  #restoreBtn,#openBtn{padding:7px 12px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:9px;cursor:pointer;font-size:13px;}
+  #restoreBtn{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600;}
+  #restoreBtn:hover,#openBtn:hover{border-color:var(--accent);}
+  #banner{display:none;width:100%;padding:9px 16px;background:#fde7e9;border-bottom:1px solid #f1707b;color:#6e0811;font-size:13px;}
+
+  .panes{flex:1;display:flex;min-height:0;}
+  .col{display:flex;flex-direction:column;min-height:0;}
+  .col-nav{flex:0 0 210px;background:var(--panel2);border-right:1px solid var(--line);}
+  .col-pages{flex:0 0 230px;background:var(--panel);border-right:1px solid var(--line);}
+  .col-editor{flex:1;min-width:0;background:var(--canvas);}
+  .col-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 6px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:650;}
+  .col-head button{width:22px;height:22px;border:none;border-radius:6px;background:transparent;color:var(--muted);font-size:16px;cursor:pointer;line-height:1;}
+  .col-head button:hover{background:var(--accent-soft);color:var(--accent);}
+  .list{overflow-y:auto;flex:1 1 0;min-height:0;padding:2px 8px;}
+  .item{padding:8px 10px;border-radius:8px;font-size:13px;cursor:pointer;margin-bottom:2px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .item:hover{background:var(--accent-soft);}
+  .item.selected{background:var(--sel);color:var(--accent);font-weight:600;}
+  .item .menu{opacity:0;border:none;background:transparent;cursor:pointer;font-size:13px;color:inherit;}
+  .item:hover .menu{opacity:.7;}
+
+  .titlebar{padding:14px 22px 6px;background:var(--panel);}
+  #pageTitle{width:100%;font-size:22px;font-weight:700;border:none;background:transparent;color:var(--ink);outline:none;}
+  #pageTitle:disabled{color:var(--muted);}
+  .toolbar{display:flex;gap:4px;padding:6px 18px 10px;background:var(--panel);border-bottom:1px solid var(--line);align-items:center;flex-wrap:wrap;}
+  .toolbar button{min-width:32px;height:30px;padding:0 8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;cursor:pointer;font-size:13px;}
+  .toolbar button:hover{border-color:var(--accent);color:var(--accent);}
+  .toolbar input[type=color]{width:30px;height:30px;padding:0;border:1px solid var(--line);border-radius:8px;cursor:pointer;background:var(--panel);}
+
+  /* canvas: own scroll, content cannot escape to the page body (Bug #1 structural fix) */
+  .canvasWrap{flex:1 1 0;min-height:0;overflow:auto;}
+  /* the page fills the whole editor area (full width + height), not a fixed A4 card */
+  .page{position:relative;width:100%;min-height:100%;background:#fff;
+    background-image:radial-gradient(var(--grid) 1px,transparent 1px);background-size:24px 24px;}
+  .page.disabled{opacity:.5;pointer-events:none;}
+  .block{position:absolute;border-radius:10px;background:#fff;border:1px solid var(--line);box-shadow:var(--shadow);}
+  .block.text{font-size:14px;line-height:1.55;overflow:hidden;}
+  .block.text [contenteditable]{outline:none;height:100%;padding:12px 14px;overflow-y:auto;overflow-x:hidden;}
+  .block.image{padding:0;overflow:hidden;}
+  .block.image img{display:block;width:100%;height:100%;object-fit:contain;pointer-events:none;}
+  .block.selected{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft),var(--shadow-lg);z-index:5;}
+  .block.dragging{box-shadow:var(--shadow-lg);z-index:6;}
+  .block.snapping{transition:left .16s ease,top .16s ease;}
+  .block .handle{position:absolute;right:-1px;bottom:-1px;width:16px;height:16px;border-radius:3px 3px 5px 3px;background:var(--accent);border:2px solid #fff;cursor:nwse-resize;display:none;}
+  .block.selected .handle{display:block;}
+  .block .del{position:absolute;right:6px;top:6px;width:22px;height:22px;border-radius:50%;background:#e23b53;color:#fff;border:2px solid #fff;font-size:13px;font-weight:700;line-height:1;cursor:pointer;display:none;align-items:center;justify-content:center;padding:0;box-shadow:0 1px 5px rgba(0,0,0,.45);z-index:8;}
+  .block:hover .del,.block.selected .del{display:flex;}
+  .block .grip{position:absolute;left:8px;right:24px;top:-9px;height:12px;border-radius:6px;background:var(--accent);opacity:0;cursor:grab;transition:opacity .12s;}
+  .block:hover .grip,.block.selected .grip{opacity:.55;}
+  .block .grip:active{cursor:grabbing;}
+
+  /* image annotation: drawing overlay + caption band + annotate toolbar */
+  .block.image .markup{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
+  .block.image.draw-on .markup{pointer-events:auto;cursor:crosshair;}
+  .block.image.draw-on img{cursor:crosshair;}
+  .block .caption{position:absolute;left:0;right:0;bottom:0;display:none;padding:6px 10px;
+    background:rgba(20,20,30,.62);color:#fff;font-size:13px;line-height:1.4;outline:none;border-radius:0 0 10px 10px;}
+  .block .caption:not(:empty){display:block;}
+  .block.selected .caption{display:block;}
+  .block .caption:empty::before{content:"Add caption…";color:rgba(255,255,255,.6);}
+  .block .annotate{position:absolute;left:6px;top:6px;display:none;gap:4px;padding:4px;
+    background:var(--panel);border:1px solid var(--line);border-radius:9px;box-shadow:var(--shadow-lg);z-index:7;}
+  .block.image.selected .annotate{display:flex;}
+  .block .annotate button{width:24px;height:24px;border:1px solid var(--line);background:var(--panel);border-radius:6px;
+    cursor:pointer;font-size:13px;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;}
+  .block .annotate button:hover{border-color:var(--accent);}
+  .block .annotate [data-draw].active{background:var(--accent-soft);border-color:var(--accent);}
+  .block .annotate .sw{border-radius:50%;}
+
+  #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#323130;color:#fff;padding:9px 15px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;box-shadow:var(--shadow-lg);}
+  #toast.show{opacity:1;}
+  #test-output{display:none;white-space:pre-wrap;font-family:Consolas,monospace;font-size:13px;padding:16px;}
+  #test-output.tests-pass{color:#0b6a0b;} #test-output.tests-fail{color:#a4262c;}
+</style>
+</head>
+<body>
+  <div id="app">
+    <div class="topbar">
+      <div class="logo">A</div>
+      <div class="brand"><h1>All Da Notes</h1><span class="version" id="appVersion"></span></div>
+      <div class="searchbox">
+        <input class="search" id="search" type="search" placeholder="Search pages…" disabled>
+        <span id="searchCount" class="search-count"></span>
+      </div>
+      <div class="spacer"></div>
+      <div id="status" class="status"><span class="dot"></span><span id="statusText">No folder</span></div>
+      <button id="restoreBtn" style="display:none"></button>
+      <button id="openBtn">Open notes folder</button>
+    </div>
+    <div id="banner"></div>
+    <div class="panes">
+      <div class="col col-nav">
+        <div class="col-head"><span>Notebooks</span><button id="addNotebookBtn" title="Add notebook">＋</button></div>
+        <div class="list" id="nbList"></div>
+        <div class="col-head"><span>Sections</span><button id="addSectionBtn" title="Add section">＋</button></div>
+        <div class="list" id="secList"></div>
+        <div class="update-status" id="updateStatus"></div>
+      </div>
+      <div class="col col-pages">
+        <div class="col-head"><span>Pages</span><button id="addPageBtn" title="Add page">＋</button></div>
+        <div class="list" id="pageList"></div>
+      </div>
+      <div class="col col-editor">
+        <div class="titlebar"><input id="pageTitle" placeholder="Page title" disabled></div>
+        <div class="toolbar">
+          <button data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+          <button data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+          <button data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+          <button data-block="H1" title="Heading 1">H1</button>
+          <button data-block="H2" title="Heading 2">H2</button>
+          <button data-block="P" title="Normal text">¶</button>
+          <button data-cmd="insertUnorderedList" title="Bulleted list">•</button>
+          <button data-cmd="insertOrderedList" title="Numbered list">1.</button>
+          <input type="color" id="foreColor" title="Text color" value="#c00000">
+          <input type="color" id="hiliteColor" title="Highlight" value="#ffff00">
+        </div>
+        <div class="canvasWrap" id="canvasWrap">
+          <div class="page disabled" id="canvas"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="toast"></div>
+  <pre id="test-output"></pre>
+
+<script>
+"use strict";
+
+// ===== VERSION / UPDATE CHECK =====
+const APP_VERSION = "1.0.0";
+// TODO: set to the GitHub URL that returns the latest version (raw text like "1.0.1",
+// or the releases API JSON e.g. https://api.github.com/repos/<owner>/<repo>/releases/latest).
+// Leave empty to disable the update check.
+const UPDATE_CHECK_URL = "";
+
+// Extract a dotted version (e.g. "1.2.3") from raw text or a releases JSON payload.
+function parseLatestVersion(text) {
+  if (text == null) return null;
+  const s = String(text).trim();
+  try {
+    const j = JSON.parse(s);
+    const obj = Array.isArray(j) ? j[0] : j;
+    const cand = obj && (obj.tag_name || obj.version || obj.latest || obj.name);
+    if (cand) { const m = String(cand).match(/\d+(?:\.\d+)*/); if (m) return m[0]; }
+  } catch (e) { /* not JSON — fall through to plain-text scan */ }
+  const m = s.match(/\d+(?:\.\d+)*/);
+  return m ? m[0] : null;
+}
+
+// Compare dotted version strings: 1 if a>b, -1 if a<b, 0 if equal.
+function compareVersions(a, b) {
+  const pa = String(a).split("."), pb = String(b).split(".");
+  const n = Math.max(pa.length, pb.length);
+  for (let i = 0; i < n; i++) {
+    const x = parseInt(pa[i], 10) || 0, y = parseInt(pb[i], 10) || 0;
+    if (x > y) return 1;
+    if (x < y) return -1;
+  }
+  return 0;
+}
+
+// ===== UTILS =====
+function slugify(title) {
+  const base = String(title)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return base || "untitled";
+}
+
+function uniqueSlug(base, taken) {
+  const set = new Set(taken);
+  if (!set.has(base)) return base;
+  let n = 2;
+  while (set.has(base + "-" + n)) n++;
+  return base + "-" + n;
+}
+function genId(prefix) {
+  return prefix + "_" + Math.random().toString(36).slice(2, 8);
+}
+function nowISO() {
+  return new Date().toISOString();
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function debounce(fn, ms) {
+  let t = null;
+  return function () {
+    const ctx = this, args = arguments;
+    clearTimeout(t);
+    t = setTimeout(() => fn.apply(ctx, args), ms);
+  };
+}
+function throttle(fn, ms) {
+  let last = 0, timer = null;
+  return function () {
+    const ctx = this, args = arguments;
+    const now = Date.now();
+    const remaining = ms - (now - last);
+    if (remaining <= 0) {
+      last = now;
+      fn.apply(ctx, args);
+    } else if (!timer) {
+      timer = setTimeout(() => { last = Date.now(); timer = null; fn.apply(ctx, args); }, remaining);
+    }
+  };
+}
+
+// ===== INDEX =====
+function emptyIndex() {
+  return { version: 1, notebooks: [] };
+}
+function serializeIndex(index) {
+  return JSON.stringify(index, null, 2);
+}
+function validateIndex(obj) {
+  return !!obj && obj.version === 1 && Array.isArray(obj.notebooks);
+}
+function parseIndex(text) {
+  const obj = JSON.parse(text);
+  if (!validateIndex(obj)) throw new Error("invalid index shape");
+  return obj;
+}
+
+// ===== MODEL =====
+function findNotebook(index, nbId) {
+  return index.notebooks.find(n => n.id === nbId) || null;
+}
+function findSection(index, nbId, secId) {
+  const nb = findNotebook(index, nbId);
+  return nb ? (nb.sections.find(s => s.id === secId) || null) : null;
+}
+function findPage(index, nbId, secId, pgId) {
+  const sec = findSection(index, nbId, secId);
+  return sec ? (sec.pages.find(p => p.id === pgId) || null) : null;
+}
+function pagePath(nbSlug, secSlug, pgSlug) {
+  return nbSlug + "/" + secSlug + "/" + pgSlug + ".html";
+}
+function addNotebook(index, title) {
+  const slug = uniqueSlug(slugify(title), index.notebooks.map(n => n.slug));
+  const nb = { id: genId("nb"), title: title, slug: slug, order: index.notebooks.length, sections: [] };
+  index.notebooks.push(nb);
+  return nb;
+}
+function addSection(index, notebookId, title) {
+  const nb = findNotebook(index, notebookId);
+  if (!nb) throw new Error("notebook not found: " + notebookId);
+  const slug = uniqueSlug(slugify(title), nb.sections.map(s => s.slug));
+  const sec = { id: genId("sec"), title: title, slug: slug, order: nb.sections.length, pages: [] };
+  nb.sections.push(sec);
+  return sec;
+}
+function addPage(index, notebookId, sectionId, title) {
+  const nb = findNotebook(index, notebookId);
+  if (!nb) throw new Error("notebook not found: " + notebookId);
+  const sec = nb.sections.find(s => s.id === sectionId);
+  if (!sec) throw new Error("section not found: " + sectionId);
+  const slug = uniqueSlug(slugify(title), sec.pages.map(p => p.slug));
+  const ts = nowISO();
+  const pg = { id: genId("pg"), title: title, slug: slug,
+               path: pagePath(nb.slug, sec.slug, slug), order: sec.pages.length,
+               created: ts, modified: ts };
+  sec.pages.push(pg);
+  return pg;
+}
+
+function recomputePaths(index) {
+  for (const nb of index.notebooks)
+    for (const sec of nb.sections)
+      for (const pg of sec.pages)
+        pg.path = pagePath(nb.slug, sec.slug, pg.slug);
+}
+function collectPagePaths(index) {
+  const map = {};
+  for (const nb of index.notebooks)
+    for (const sec of nb.sections)
+      for (const pg of sec.pages)
+        map[pg.id] = pg.path;
+  return map;
+}
+function diffPaths(before, after) {
+  const changes = [];
+  for (const id in after)
+    if (before[id] && before[id] !== after[id])
+      changes.push({ id: id, from: before[id], to: after[id] });
+  return changes;
+}
+
+function renameNotebook(index, id, newTitle) {
+  const nb = findNotebook(index, id);
+  if (!nb) throw new Error("notebook not found: " + id);
+  const siblings = index.notebooks.filter(n => n !== nb).map(n => n.slug);
+  nb.title = newTitle;
+  nb.slug = uniqueSlug(slugify(newTitle), siblings);
+  recomputePaths(index);
+}
+function renameSection(index, notebookId, id, newTitle) {
+  const nb = findNotebook(index, notebookId);
+  if (!nb) throw new Error("notebook not found: " + notebookId);
+  const sec = nb.sections.find(s => s.id === id);
+  if (!sec) throw new Error("section not found: " + id);
+  const siblings = nb.sections.filter(s => s !== sec).map(s => s.slug);
+  sec.title = newTitle;
+  sec.slug = uniqueSlug(slugify(newTitle), siblings);
+  recomputePaths(index);
+}
+function renamePage(index, notebookId, sectionId, id, newTitle) {
+  const sec = findSection(index, notebookId, sectionId);
+  if (!sec) throw new Error("section not found: " + sectionId);
+  const pg = sec.pages.find(p => p.id === id);
+  if (!pg) throw new Error("page not found: " + id);
+  const siblings = sec.pages.filter(p => p !== pg).map(p => p.slug);
+  pg.title = newTitle;
+  pg.slug = uniqueSlug(slugify(newTitle), siblings);
+  pg.modified = nowISO();
+  recomputePaths(index);
+}
+
+function deleteNotebook(index, id) {
+  const i = index.notebooks.findIndex(n => n.id === id);
+  if (i < 0) throw new Error("notebook not found: " + id);
+  return index.notebooks.splice(i, 1)[0];
+}
+function deleteSection(index, notebookId, id) {
+  const nb = findNotebook(index, notebookId);
+  if (!nb) throw new Error("notebook not found: " + notebookId);
+  const i = nb.sections.findIndex(s => s.id === id);
+  if (i < 0) throw new Error("section not found: " + id);
+  return nb.sections.splice(i, 1)[0];
+}
+function deletePage(index, notebookId, sectionId, id) {
+  const sec = findSection(index, notebookId, sectionId);
+  if (!sec) throw new Error("section not found: " + sectionId);
+  const i = sec.pages.findIndex(p => p.id === id);
+  if (i < 0) throw new Error("page not found: " + id);
+  return sec.pages.splice(i, 1)[0];
+}
+
+// ===== SEARCH =====
+function filterPagesByTitle(index, query) {
+  const q = String(query || "").trim().toLowerCase();
+  const results = [];
+  for (const nb of index.notebooks)
+    for (const sec of nb.sections)
+      for (const pg of sec.pages)
+        if (!q || pg.title.toLowerCase().indexOf(q) !== -1)
+          results.push({ notebookId: nb.id, sectionId: sec.id, page: pg });
+  return results;
+}
+
+// Plain text of a page's stored HTML (tags stripped) — used for content search.
+function pageText(html) {
+  const d = new DOMParser().parseFromString(html || "", "text/html");
+  return (d.body && d.body.textContent) || "";
+}
+
+// True if a page's title OR its text content contains the query (case-insensitive).
+function pageMatches(title, html, query) {
+  const q = String(query || "").toLowerCase();
+  if (!q) return false;
+  return String(title || "").toLowerCase().indexOf(q) !== -1 ||
+         pageText(html).toLowerCase().indexOf(q) !== -1;
+}
+
+// ===== BLOCKS =====
+function serializePage(blocks) {
+  return blocks.map(b => {
+    const style = "left:" + b.x + "px;top:" + b.y + "px;width:" + b.w + "px;height:" + b.h + "px;";
+    let inner;
+    if (b.type === "image") {
+      inner = '<img src="' + b.content + '">' +
+              '<svg class="markup" viewBox="0 0 100 100" preserveAspectRatio="none">' + (b.drawing || "") + '</svg>' +
+              '<div class="caption">' + (b.caption || "") + '</div>';
+    } else {
+      inner = b.content;
+    }
+    return '<div class="block" data-type="' + b.type + '" style="' + style + '">' + inner + '</div>';
+  }).join("\n");
+}
+
+function _pxNum(style, prop) {
+  const m = new RegExp(prop + "\\s*:\\s*(-?\\d+(?:\\.\\d+)?)px").exec(style || "");
+  return m ? Math.round(parseFloat(m[1])) : 0;
+}
+
+function parsePage(html) {
+  const doc = new DOMParser().parseFromString(
+    "<body>" + (html || "") + "</body>", "text/html");
+  const els = doc.querySelectorAll(".block");
+  if (els.length === 0) {
+    const body = (html || "").trim();
+    if (!body) return [];
+    return [{ type: "text", x: 24, y: 24, w: 720, h: 300, content: body }];
+  }
+  const blocks = [];
+  els.forEach(el => {
+    const type = el.getAttribute("data-type") === "image" ? "image" : "text";
+    const style = el.getAttribute("style") || "";
+    const x = _pxNum(style, "left"), y = _pxNum(style, "top");
+    const w = _pxNum(style, "width"), h = _pxNum(style, "height");
+    if (type === "image") {
+      const img = el.querySelector("img");
+      const content = img ? img.getAttribute("src") || "" : "";
+      const svg = el.querySelector("svg.markup");
+      const drawing = svg ? svg.innerHTML.trim() : "";
+      const capEl = el.querySelector(".caption");
+      const caption = capEl ? capEl.innerHTML : "";
+      blocks.push({ type: "image", x: x, y: y, w: w, h: h, content: content, drawing: drawing, caption: caption });
+    } else {
+      blocks.push({ type: "text", x: x, y: y, w: w, h: h, content: el.innerHTML });
+    }
+  });
+  return blocks;
+}
+
+function clampResize(block, others, candW, candH, canvasW, canvasH) {
+  let w = Math.max(80, Math.min(candW, canvasW - block.x));
+  let h = Math.max(48, Math.min(candH, canvasH - block.y));
+  for (const o of others) {
+    // vertical overlap in the block's row and neighbour to the right -> limit width
+    if (o.y < block.y + h && o.y + o.h > block.y && o.x > block.x)
+      w = Math.min(w, o.x - block.x);
+    // horizontal overlap in the block's column and neighbour below -> limit height
+    if (o.x < block.x + w && o.x + o.w > block.x && o.y > block.y)
+      h = Math.min(h, o.y - block.y);
+  }
+  return { w: Math.max(80, w), h: Math.max(48, h) };
+}
+
+function rectsOverlap(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x &&
+         a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function resolveDrag(moving, others, cand, canvasW, canvasH) {
+  const w = moving.w, h = moving.h;
+  const nx = Math.max(0, Math.min(cand.x, canvasW - w));
+  const ny = Math.max(0, Math.min(cand.y, canvasH - h));
+  const hits = r => others.some(o => rectsOverlap(r, o));
+  if (!hits({ x: nx, y: ny, w: w, h: h }) && !hits({ x: nx, y: moving.y, w: w, h: h })) return { x: nx, y: ny };
+  if (!hits({ x: moving.x, y: ny, w: w, h: h })) return { x: moving.x, y: ny };
+  if (!hits({ x: nx, y: moving.y, w: w, h: h })) return { x: nx, y: moving.y };
+  return { x: moving.x, y: moving.y };
+}
+
+// On drop: keep the dropped position if it doesn't overlap; otherwise return the
+// nearest position (expanding square-ring search) where the block fits without overlap.
+function nearestFreeSpot(rect, others, canvasW, canvasH) {
+  const w = rect.w, h = rect.h;
+  const clampX = x => Math.max(0, Math.min(x, Math.max(0, canvasW - w)));
+  const clampY = y => Math.max(0, Math.min(y, Math.max(0, canvasH - h)));
+  const free = (x, y) => !others.some(o => rectsOverlap({ x: x, y: y, w: w, h: h }, o));
+  const x0 = clampX(rect.x), y0 = clampY(rect.y);
+  if (free(x0, y0)) return { x: x0, y: y0 };
+  const STEP = 8, MAX = Math.max(canvasW, canvasH) + h;
+  const consider = (cx, cy, acc) => {
+    const x = clampX(cx), y = clampY(cy);
+    if (free(x, y)) { const d = (x - x0) * (x - x0) + (y - y0) * (y - y0); if (d < acc.d) { acc.d = d; acc.best = { x: x, y: y }; } }
+  };
+  for (let r = STEP; r <= MAX; r += STEP) {
+    const acc = { best: null, d: Infinity };
+    for (let dx = -r; dx <= r; dx += STEP) { consider(rect.x + dx, rect.y - r, acc); consider(rect.x + dx, rect.y + r, acc); }
+    for (let dy = -r + STEP; dy <= r - STEP; dy += STEP) { consider(rect.x - r, rect.y + dy, acc); consider(rect.x + r, rect.y + dy, acc); }
+    if (acc.best) return acc.best;
+  }
+  return { x: x0, y: y0 };
+}
+
+const Blocks = {
+  canvas: null,
+  blocks: [],          // [{id,type,x,y,w,h,content,el}]
+  selectedId: null,
+  onChange: null,
+  lastClick: { x: 40, y: 40 },
+
+  init(canvasEl, onChange) {
+    Blocks.canvas = canvasEl;
+    Blocks.onChange = onChange;
+    Blocks.bindCanvas();
+    Blocks.bindPaste();
+  },
+  setEnabled(on) { Blocks.canvas.classList.toggle("disabled", !on); },
+
+  clear() {
+    Blocks.blocks = [];
+    Blocks.selectedId = null;
+    Blocks.canvas.innerHTML = "";
+    Blocks._growCanvas();
+  },
+
+  load(html) {
+    Blocks.clear();
+    parsePage(html).forEach(rec => Blocks._add(rec, false));
+    Blocks._growCanvas();
+  },
+
+  serialize() {
+    return serializePage(Blocks.blocks.map(b => {
+      if (b.type === "image") {
+        const svg = b.el && b.el.querySelector("svg.markup");
+        const capEl = b.el && b.el.querySelector(".caption");
+        return { type: "image", x: b.x, y: b.y, w: b.w, h: b.h, content: b.content,
+                 drawing: svg ? svg.innerHTML.trim() : (b.drawing || ""),
+                 caption: capEl ? (capEl.textContent.trim() === "" ? "" : capEl.innerHTML) : (b.caption || "") };
+      }
+      return { type: "text", x: b.x, y: b.y, w: b.w, h: b.h, content: Blocks._contentOf(b) };
+    }));
+  },
+
+  _contentOf(b) {
+    const ce = b.el ? b.el.querySelector("[contenteditable]") : null;
+    return ce ? ce.innerHTML : b.content;
+  },
+
+  _add(rec, fireChange) {
+    const b = { id: genId("blk"), type: rec.type, x: rec.x, y: rec.y, w: rec.w, h: rec.h, content: rec.content,
+                drawing: rec.drawing || "", caption: rec.caption || "", el: null };
+    Blocks.blocks.push(b);
+    Blocks._render(b);
+    Blocks._growCanvas();
+    if (fireChange && Blocks.onChange) Blocks.onChange();
+    return b;
+  },
+
+  _render(b) {
+    const el = document.createElement("div");
+    el.className = "block " + b.type;
+    el.dataset.id = b.id;
+    el.style.left = b.x + "px"; el.style.top = b.y + "px";
+    el.style.width = b.w + "px"; el.style.height = b.h + "px";
+    if (b.type === "image") {
+      const img = document.createElement("img"); img.src = b.content; el.appendChild(img);
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("class", "markup");
+      svg.setAttribute("viewBox", "0 0 100 100");
+      svg.setAttribute("preserveAspectRatio", "none");
+      svg.innerHTML = b.drawing || "";
+      el.appendChild(svg);
+      const cap = document.createElement("div");
+      cap.className = "caption"; cap.setAttribute("contenteditable", "true");
+      cap.innerHTML = b.caption || "";
+      cap.addEventListener("focus", () => Editor.setActive(cap));
+      cap.addEventListener("input", () => {
+        if (cap.textContent.trim() === "" && cap.innerHTML !== "") cap.innerHTML = ""; // drop stray <br>
+        if (Blocks.onChange) Blocks.onChange();
+      });
+      el.appendChild(cap);
+      Blocks._attachAnnotate(b, el, svg);
+    } else {
+      const ce = document.createElement("div");
+      ce.setAttribute("contenteditable", "true");
+      ce.innerHTML = b.content || "";
+      ce.addEventListener("focus", () => Editor.setActive(ce));
+      ce.addEventListener("input", () => { if (Blocks.onChange) Blocks.onChange(); });
+      el.appendChild(ce);
+    }
+    const del = document.createElement("button"); del.className = "del"; del.textContent = "✕"; del.title = "Delete block";
+    const handle = document.createElement("div"); handle.className = "handle";
+    el.appendChild(del); el.appendChild(handle);
+    const grip = document.createElement("div"); grip.className = "grip"; grip.title = "Drag to move";
+    el.appendChild(grip);
+    b.el = el;
+    Blocks.canvas.appendChild(el);
+    Blocks._attachSelect(b); Blocks._attachDrag(b); Blocks._attachResize(b);
+    del.addEventListener("pointerdown", e => { e.stopPropagation(); });
+    del.addEventListener("click", e => { e.stopPropagation(); Blocks.remove(b.id); });
+  },
+
+  _others(except) {
+    return Blocks.blocks.filter(b => b.id !== except).map(b => ({ x: b.x, y: b.y, w: b.w, h: b.h }));
+  },
+  _findFreeSpot(x, y, w, h) {
+    const cw = Blocks.canvas.clientWidth;
+    const nx = Math.max(0, Math.min(x, Math.max(0, cw - w)));
+    let ny = Math.max(0, y);
+    const others = Blocks._others(null);
+    let guard = 0;
+    while (others.some(o => rectsOverlap({ x: nx, y: ny, w: w, h: h }, o)) && guard++ < 500) ny += 24;
+    return { x: nx, y: ny };
+  },
+  _growCanvas() {
+    let maxBottom = 0;
+    for (const b of Blocks.blocks) maxBottom = Math.max(maxBottom, b.y + b.h);
+    Blocks.canvas.style.height = (maxBottom + 120) + "px";
+  },
+  _byId(id) { return Blocks.blocks.find(b => b.id === id) || null; },
+
+  drawingId: null,
+  drawColor: "#1f2430",
+
+  select(id) {
+    if (Blocks.drawingId && Blocks.drawingId !== id) Blocks._setDraw(Blocks._byId(Blocks.drawingId), false);
+    Blocks.selectedId = id;
+    Blocks.blocks.forEach(b => b.el.classList.toggle("selected", b.id === id));
+  },
+  deselect() {
+    if (Blocks.drawingId) Blocks._setDraw(Blocks._byId(Blocks.drawingId), false);
+    Blocks.selectedId = null;
+    Blocks.blocks.forEach(b => b.el.classList.remove("selected"));
+  },
+  _setDraw(b, on) {
+    if (!b) return;
+    Blocks.drawingId = on ? b.id : (Blocks.drawingId === b.id ? null : Blocks.drawingId);
+    b.el.classList.toggle("draw-on", on);
+    const btn = b.el.querySelector(".annotate [data-draw]");
+    if (btn) btn.classList.toggle("active", on);
+  },
+  _attachAnnotate(b, el, svg) {
+    const bar = document.createElement("div");
+    bar.className = "annotate";
+    bar.innerHTML =
+      '<button data-draw title="Draw on image">✏️</button>' +
+      '<button class="sw" data-color="#1f2430" style="background:#1f2430" title="Black"></button>' +
+      '<button class="sw" data-color="#e0697a" style="background:#e0697a" title="Red"></button>' +
+      '<button class="sw" data-color="#2f6fed" style="background:#2f6fed" title="Blue"></button>' +
+      '<button data-undo title="Undo stroke">⤺</button>' +
+      '<button data-clear title="Clear drawing">🗑</button>';
+    el.appendChild(bar);
+    bar.addEventListener("pointerdown", e => e.stopPropagation());
+    bar.querySelector("[data-draw]").addEventListener("click", e => {
+      e.stopPropagation();
+      Blocks._setDraw(b, Blocks.drawingId !== b.id);
+    });
+    bar.querySelectorAll(".sw").forEach(sw => sw.addEventListener("click", e => {
+      e.stopPropagation();
+      Blocks.drawColor = sw.getAttribute("data-color");
+      if (Blocks.drawingId !== b.id) Blocks._setDraw(b, true);
+    }));
+    bar.querySelector("[data-undo]").addEventListener("click", e => {
+      e.stopPropagation();
+      const last = svg.querySelector("path:last-of-type");
+      if (last) { last.remove(); if (Blocks.onChange) Blocks.onChange(); }
+    });
+    bar.querySelector("[data-clear]").addEventListener("click", e => {
+      e.stopPropagation();
+      if (svg.childNodes.length) { svg.innerHTML = ""; if (Blocks.onChange) Blocks.onChange(); }
+    });
+    Blocks._attachDraw(b, svg);
+  },
+  _attachDraw(b, svg) {
+    svg.addEventListener("pointerdown", e => {
+      if (Blocks.drawingId !== b.id || e.button !== 0) return;
+      e.preventDefault(); e.stopPropagation();
+      const r = svg.getBoundingClientRect();
+      const pt = ev => Math.round((ev.clientX - r.left) / r.width * 1000) / 10 + " " +
+                       Math.round((ev.clientY - r.top) / r.height * 1000) / 10;
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", "M" + pt(e));
+      path.setAttribute("stroke", Blocks.drawColor);
+      path.setAttribute("stroke-width", "3");
+      path.setAttribute("fill", "none");
+      path.setAttribute("vector-effect", "non-scaling-stroke");
+      path.setAttribute("stroke-linecap", "round");
+      path.setAttribute("stroke-linejoin", "round");
+      svg.appendChild(path);
+      svg.setPointerCapture(e.pointerId);
+      const move = ev => path.setAttribute("d", path.getAttribute("d") + "L" + pt(ev));
+      const up = () => {
+        svg.releasePointerCapture(e.pointerId);
+        svg.removeEventListener("pointermove", move);
+        svg.removeEventListener("pointerup", up);
+        svg.removeEventListener("pointercancel", up);
+        if (Blocks.onChange) Blocks.onChange();
+      };
+      svg.addEventListener("pointermove", move);
+      svg.addEventListener("pointerup", up);
+      svg.addEventListener("pointercancel", up);
+    });
+  },
+  _attachSelect(b) {
+    b.el.addEventListener("pointerdown", () => Blocks.select(b.id));
+  },
+  _attachDrag(b) {
+    b.el.addEventListener("pointerdown", e => {
+      // don't start a drag from the resize handle, delete button, while editing text,
+      // while annotating (draw mode), or from the annotate toolbar
+      if (Blocks.drawingId === b.id) return;
+      if (e.target.closest && e.target.closest(".annotate")) return;
+      if (e.target.classList.contains("handle") || e.target.classList.contains("del")) return;
+      if (e.target.isContentEditable) return;
+      if (e.button !== 0) return;
+      e.preventDefault();
+      const sx = e.clientX, sy = e.clientY, ox = b.x, oy = b.y;
+      b.el.setPointerCapture(e.pointerId);
+      b.el.classList.add("dragging");
+      const move = ev => {
+        // free movement: follow the cursor, clamped to the canvas, overlap allowed
+        const cw = Blocks.canvas.clientWidth, ch = Blocks.canvas.clientHeight;
+        b.x = Math.max(0, Math.min(ox + (ev.clientX - sx), Math.max(0, cw - b.w)));
+        b.y = Math.max(0, Math.min(oy + (ev.clientY - sy), Math.max(0, ch - b.h)));
+        b.el.style.left = b.x + "px"; b.el.style.top = b.y + "px";
+      };
+      const up = ev => {
+        b.el.releasePointerCapture(e.pointerId);
+        b.el.classList.remove("dragging");
+        b.el.removeEventListener("pointermove", move);
+        b.el.removeEventListener("pointerup", up);
+        b.el.removeEventListener("pointercancel", up);
+        // on drop: keep if it fits, else snap to the nearest non-overlapping spot
+        const bound = Math.max(Blocks.canvas.clientHeight, b.y + b.h + 8);
+        const pos = nearestFreeSpot({ x: b.x, y: b.y, w: b.w, h: b.h }, Blocks._others(b.id),
+                                    Blocks.canvas.clientWidth, bound);
+        if (pos.x !== b.x || pos.y !== b.y) {
+          b.el.classList.add("snapping");
+          setTimeout(() => b.el.classList.remove("snapping"), 180);
+          b.x = pos.x; b.y = pos.y;
+          b.el.style.left = b.x + "px"; b.el.style.top = b.y + "px";
+        }
+        Blocks._growCanvas();
+        if (Blocks.onChange) Blocks.onChange();
+      };
+      b.el.addEventListener("pointermove", move);
+      b.el.addEventListener("pointerup", up);
+      b.el.addEventListener("pointercancel", up);
+    });
+  },
+  _attachResize(b) {
+    const handle = b.el.querySelector(".handle");
+    handle.addEventListener("pointerdown", e => {
+      e.preventDefault(); e.stopPropagation();
+      Blocks.select(b.id);
+      const sx = e.clientX, sy = e.clientY, ow = b.w, oh = b.h;
+      const ratio = b.type === "image" ? ow / oh : 0;
+      handle.setPointerCapture(e.pointerId);
+      const move = ev => {
+        let cw = ow + (ev.clientX - sx);
+        let ch = oh + (ev.clientY - sy);
+        if (ratio) ch = Math.round(cw / ratio); // images keep aspect ratio
+        const size = clampResize({ x: b.x, y: b.y, w: b.w, h: b.h }, Blocks._others(b.id),
+                                 cw, ch, Blocks.canvas.clientWidth, Blocks.canvas.clientHeight);
+        b.w = size.w; b.h = size.h;
+        b.el.style.width = b.w + "px"; b.el.style.height = b.h + "px";
+      };
+      const up = ev => {
+        handle.releasePointerCapture(e.pointerId);
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", up);
+        handle.removeEventListener("pointercancel", up);
+        Blocks._growCanvas();
+        if (Blocks.onChange) Blocks.onChange();
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", up);
+      handle.addEventListener("pointercancel", up);
+    });
+  },
+  remove(id) {
+    const b = Blocks._byId(id);
+    if (!b) return;
+    b.el.remove();
+    Blocks.blocks = Blocks.blocks.filter(x => x.id !== id);
+    if (Blocks.selectedId === id) Blocks.selectedId = null;
+    if (Blocks.drawingId === id) Blocks.drawingId = null;
+    Blocks._growCanvas();
+    if (Blocks.onChange) Blocks.onChange();
+  },
+  addTextAt(x, y) {
+    const pos = Blocks._findFreeSpot(x, y, 320, 180);
+    const b = Blocks._add({ type: "text", x: pos.x, y: pos.y, w: 320, h: 180, content: "" }, true);
+    Blocks.select(b.id);
+    const ce = b.el.querySelector("[contenteditable]");
+    if (ce) ce.focus();
+    return b;
+  },
+  bindCanvas() {
+    // double-click empty canvas -> new text block at that point
+    Blocks.canvas.addEventListener("dblclick", e => {
+      if (e.target !== Blocks.canvas) return; // only empty space
+      if (Blocks.canvas.classList.contains("disabled")) return;
+      const r = Blocks.canvas.getBoundingClientRect();
+      Blocks.addTextAt(Math.round(e.clientX - r.left), Math.round(e.clientY - r.top));
+    });
+    // click empty canvas -> deselect; track last click point for paste
+    Blocks.canvas.addEventListener("pointerdown", e => {
+      if (e.target !== Blocks.canvas) return;
+      const r = Blocks.canvas.getBoundingClientRect();
+      Blocks.lastClick = { x: Math.round(e.clientX - r.left), y: Math.round(e.clientY - r.top) };
+      Blocks.deselect();
+    });
+    // Delete key removes the selected block (unless editing text)
+    document.addEventListener("keydown", e => {
+      if ((e.key === "Delete" || e.key === "Backspace") && Blocks.selectedId) {
+        if (document.activeElement && document.activeElement.isContentEditable) return;
+        e.preventDefault();
+        Blocks.remove(Blocks.selectedId);
+      }
+    });
+  },
+  bindPaste() {
+    document.addEventListener("paste", e => {
+      if (Blocks.canvas.classList.contains("disabled")) return;
+      // If editing text, let the browser handle the paste normally.
+      if (document.activeElement && document.activeElement.isContentEditable) return;
+      const items = (e.clipboardData && e.clipboardData.items) || [];
+      for (const it of items) {
+        if (it.type && it.type.indexOf("image") === 0) {
+          const file = it.getAsFile();
+          if (!file) continue;
+          e.preventDefault();
+          const reader = new FileReader();
+          reader.onload = () => Blocks._addImageDataUri(reader.result);
+          reader.readAsDataURL(file);
+          return;
+        }
+      }
+      // non-image paste onto the canvas background: ignore gracefully
+    });
+  },
+  _addImageDataUri(dataUri) {
+    const img = new Image();
+    img.onload = () => {
+      const maxW = Blocks.canvas.clientWidth - 48;
+      let w = img.naturalWidth || 240, h = img.naturalHeight || 160;
+      if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+      const pos = Blocks._findFreeSpot(Blocks.lastClick.x, Blocks.lastClick.y, w, h);
+      const b = Blocks._add({ type: "image", x: pos.x, y: pos.y, w: w, h: h, content: dataUri }, true);
+      Blocks.select(b.id);
+    };
+    img.src = dataUri;
+  },
+};
+
+// ===== STORAGE =====
+const IDB_DB = "onenote-lite", IDB_STORE = "handles", IDB_KEY = "rootDir";
+
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    let req;
+    try { req = indexedDB.open(IDB_DB, 1); }
+    catch (e) { reject(e); return; }
+    req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbSet(key, val) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, "readwrite");
+    tx.objectStore(IDB_STORE).put(val, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function idbGet(key) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, "readonly");
+    const r = tx.objectStore(IDB_STORE).get(key);
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  });
+}
+
+const Storage = {
+  supported() {
+    return typeof window.showDirectoryPicker === "function";
+  },
+  async pickFolder() {
+    return await window.showDirectoryPicker({ mode: "readwrite" });
+  },
+  async saveHandle(handle) {
+    try { await idbSet(IDB_KEY, handle); return true; } catch (e) { return false; }
+  },
+  async loadHandle() {
+    try { return (await idbGet(IDB_KEY)) || null; } catch (e) { return null; }
+  },
+  async verifyPermission(handle, write) {
+    const opts = { mode: write ? "readwrite" : "read" };
+    if ((await handle.queryPermission(opts)) === "granted") return true;
+    if ((await handle.requestPermission(opts)) === "granted") return true;
+    return false;
+  },
+  _split(relPath) {
+    const i = relPath.lastIndexOf("/");
+    return { dir: i < 0 ? "" : relPath.slice(0, i), name: i < 0 ? relPath : relPath.slice(i + 1) };
+  },
+  async getDir(root, relDir, create) {
+    let dir = root;
+    if (!relDir) return dir;
+    for (const part of relDir.split("/").filter(Boolean))
+      dir = await dir.getDirectoryHandle(part, { create: !!create });
+    return dir;
+  },
+  async writeFile(root, relPath, contents) {
+    const p = Storage._split(relPath);
+    const d = await Storage.getDir(root, p.dir, true);
+    const fh = await d.getFileHandle(p.name, { create: true });
+    const w = await fh.createWritable();
+    await w.write(contents);
+    await w.close();
+  },
+  async readFile(root, relPath) {
+    const p = Storage._split(relPath);
+    const d = await Storage.getDir(root, p.dir, false);
+    const fh = await d.getFileHandle(p.name, { create: false });
+    return await (await fh.getFile()).text();
+  },
+  async deleteFile(root, relPath) {
+    const p = Storage._split(relPath);
+    const d = await Storage.getDir(root, p.dir, false);
+    await d.removeEntry(p.name);
+  },
+  async movePage(root, from, to) {
+    if (from === to) return;
+    const content = await Storage.readFile(root, from);
+    await Storage.writeFile(root, to, content);
+    try { await Storage.deleteFile(root, from); } catch (e) { /* best effort */ }
+  },
+  async removeDir(root, relDir) {
+    const p = Storage._split(relDir);
+    const parent = await Storage.getDir(root, p.dir, false);
+    await parent.removeEntry(p.name, { recursive: true });
+  },
+  async readIndex(root) {
+    try { return parseIndex(await Storage.readFile(root, "index.json")); }
+    catch (e) { return null; }
+  },
+  async writeIndex(root, index) {
+    await Storage.writeFile(root, "index.json", serializeIndex(index));
+  },
+  async scanTree(root) {
+    const index = emptyIndex();
+    for await (const entry of root.entries()) {
+      const nbName = entry[0], nbHandle = entry[1];
+      if (nbHandle.kind !== "directory") continue;
+      const nb = { id: genId("nb"), title: nbName, slug: nbName, order: index.notebooks.length, sections: [] };
+      for await (const sEntry of nbHandle.entries()) {
+        const secName = sEntry[0], secHandle = sEntry[1];
+        if (secHandle.kind !== "directory") continue;
+        const sec = { id: genId("sec"), title: secName, slug: secName, order: nb.sections.length, pages: [] };
+        for await (const fEntry of secHandle.entries()) {
+          const fName = fEntry[0], fHandle = fEntry[1];
+          if (fHandle.kind === "file" && fName.slice(-5) === ".html") {
+            const slug = fName.slice(0, -5);
+            const ts = nowISO();
+            sec.pages.push({ id: genId("pg"), title: slug, slug: slug,
+              path: pagePath(nbName, secName, slug), order: sec.pages.length, created: ts, modified: ts });
+          }
+        }
+        nb.sections.push(sec);
+      }
+      index.notebooks.push(nb);
+    }
+    return index;
+  }
+};
+
+// ===== EDITOR =====
+const Editor = {
+  activeEl: null,      // the focused block's contenteditable element
+  onChange: null,
+  init(onChange) { Editor.onChange = onChange; },
+  setActive(el) { Editor.activeEl = el; },
+  exec(cmd, value) {
+    if (!Editor.activeEl) return;
+    Editor.activeEl.focus();
+    document.execCommand(cmd, false, value);
+    if (Editor.onChange) Editor.onChange();
+  },
+  bindToolbar() {
+    document.querySelectorAll(".toolbar button[data-cmd]").forEach(btn => {
+      btn.addEventListener("mousedown", e => e.preventDefault());
+      btn.addEventListener("click", () => Editor.exec(btn.getAttribute("data-cmd")));
+    });
+    document.querySelectorAll(".toolbar button[data-block]").forEach(btn => {
+      btn.addEventListener("mousedown", e => e.preventDefault());
+      btn.addEventListener("click", () => Editor.exec("formatBlock", "<" + btn.getAttribute("data-block").toLowerCase() + ">"));
+    });
+    const fore = document.getElementById("foreColor");
+    fore.addEventListener("change", () => Editor.exec("foreColor", fore.value));
+    const hil = document.getElementById("hiliteColor");
+    hil.addEventListener("change", () => Editor.exec("hiliteColor", hil.value));
+  }
+};
+
+// ===== VIEW =====
+const View = {
+  render(app) {
+    View._renderNotebooks(app);
+    View._renderSections(app);
+    View._renderPages(app);
+    View._renderEditorHeader(app);
+  },
+  _list(el, items, selectedId, onSelect, onRename, onDelete) {
+    el.innerHTML = "";
+    for (const it of items) {
+      const row = document.createElement("div");
+      row.className = "item" + (it.id === selectedId ? " selected" : "");
+      const label = document.createElement("span");
+      label.textContent = it.title;
+      const menu = document.createElement("button");
+      menu.className = "menu"; menu.textContent = "⋯"; menu.title = "Rename / Delete";
+      row.appendChild(label); row.appendChild(menu);
+      row.addEventListener("click", e => { if (e.target !== menu) onSelect(it.id); });
+      menu.addEventListener("click", e => {
+        e.stopPropagation();
+        const action = window.prompt('Type "r" to rename or "d" to delete "' + it.title + '"', "r");
+        if (action === "r") {
+          const name = window.prompt("New name:", it.title);
+          if (name && name.trim()) onRename(it.id, name.trim());
+        } else if (action === "d") {
+          if (window.confirm('Delete "' + it.title + '" and everything in it?')) onDelete(it.id);
+        }
+      });
+      el.appendChild(row);
+    }
+  },
+  _renderNotebooks(app) {
+    View._list(document.getElementById("nbList"), app.index.notebooks, app.sel.notebookId,
+      id => app.selectNotebook(id), (id, n) => app.renameNotebookUI(id, n), id => app.deleteNotebookUI(id));
+  },
+  _renderSections(app) {
+    const nb = findNotebook(app.index, app.sel.notebookId);
+    View._list(document.getElementById("secList"), nb ? nb.sections : [], app.sel.sectionId,
+      id => app.selectSection(id), (id, n) => app.renameSectionUI(id, n), id => app.deleteSectionUI(id));
+  },
+  _renderPages(app) {
+    const el = document.getElementById("pageList");
+    const sec = findSection(app.index, app.sel.notebookId, app.sel.sectionId);
+    View._list(el, sec ? sec.pages : [], app.sel.pageId,
+      id => app.selectPage(id), (id, n) => app.renamePageUI(id, n), id => app.deletePageUI(id));
+  },
+  _renderEditorHeader(app) {
+    const titleEl = document.getElementById("pageTitle");
+    const pg = findPage(app.index, app.sel.notebookId, app.sel.sectionId, app.sel.pageId);
+    titleEl.disabled = !pg;
+    titleEl.value = pg ? pg.title : "";
+    Blocks.setEnabled(!!pg);
+  },
+};
+
+// ===== APP =====
+const App = {
+  root: null,
+  index: emptyIndex(),
+  sel: { notebookId: null, sectionId: null, pageId: null },
+
+  async init() {
+    document.getElementById("appVersion").textContent = "v" + APP_VERSION;
+    App.checkForUpdates();   // fire-and-forget; shows status in the nav footer
+    if (!Storage.supported()) {
+      App.showBanner("This app needs the File System Access API. Please open it in Google Chrome or Microsoft Edge.");
+      document.getElementById("openBtn").disabled = true;
+      return;
+    }
+    Blocks.init(document.getElementById("canvas"), App.onEditorChange);
+    Editor.init(App.onEditorChange);
+    Editor.bindToolbar();
+    App.bindChrome();
+    // Best-effort restore of last folder.
+    const handle = await Storage.loadHandle();
+    if (handle) {
+      try {
+        // Zero-click only if the browser already remembers the grant.
+        if ((await handle.queryPermission({ mode: "readwrite" })) === "granted") {
+          await App.useRoot(handle);
+          return;
+        }
+        // Otherwise offer a one-click reopen (the gesture the API requires).
+        App._offerReopen(handle);
+        App.setStatus("No folder");
+        return;
+      } catch (e) { /* fall through to manual open */ }
+    }
+    App.setStatus("No folder");
+  },
+
+  bindChrome() {
+    document.getElementById("openBtn").addEventListener("click", () => App.openFolder());
+    document.getElementById("addNotebookBtn").addEventListener("click", () => App.onAddNotebook());
+    document.getElementById("addSectionBtn").addEventListener("click", () => App.onAddSection());
+    document.getElementById("addPageBtn").addEventListener("click", () => App.onAddPage());
+    const search = document.getElementById("search");
+    search.addEventListener("input", () => {
+      App._clearHighlight();
+      if (!search.value.trim()) App._clearSearch();   // emptied -> reset counter/state
+      else App._searchQ = null;                       // query changed -> recompute on next Enter
+      App._updateCount();
+    });
+    search.addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); App.runSearch(); }
+    });
+    document.getElementById("pageTitle").addEventListener("change", () => App.onTitleEdit());
+    window.addEventListener("beforeunload", () => App.flushPending());
+    document.addEventListener("keydown", e => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        App.flushPending();
+        App.toast("Saved");
+      }
+    });
+    // clear a search highlight as soon as the user does anything other than search
+    document.addEventListener("pointerdown", e => {
+      if (!e.target.closest || !e.target.closest(".searchbox")) App._clearHighlight();
+    });
+  },
+
+  async openFolder() {
+    let handle;
+    try { handle = await Storage.pickFolder(); }
+    catch (e) { return; } // user cancelled
+    await Storage.saveHandle(handle); // best effort; may be no-op on opaque origin
+    await App.useRoot(handle);
+  },
+
+  async useRoot(handle) {
+    await App.flushPending();
+    App.root = handle;
+    App.hideBanner();
+    document.getElementById("restoreBtn").style.display = "none";
+    let idx = await Storage.readIndex(handle);
+    if (!idx) {
+      // No/corrupt index: rebuild from folder scan (empty for a fresh folder).
+      idx = await Storage.scanTree(handle);
+      await Storage.writeIndex(handle, idx);
+    }
+    App.index = idx;
+    App.sel = { notebookId: null, sectionId: null, pageId: null };
+    // Auto-select first notebook/section/page if present.
+    const nb = idx.notebooks[0];
+    if (nb) {
+      App.sel.notebookId = nb.id;
+      const sec = nb.sections[0];
+      if (sec) {
+        App.sel.sectionId = sec.id;
+        if (sec.pages[0]) App.sel.pageId = sec.pages[0].id;
+      }
+    }
+    document.getElementById("search").disabled = false;
+    App.setStatus("Saved");
+    await App.loadCurrentPageIntoEditor();
+    View.render(App);
+  },
+
+  setStatus(text) {
+    document.getElementById("statusText").textContent = text;
+    const el = document.getElementById("status");
+    el.className = "status" + (text === "Saved" ? " saved" : text === "Saving…" ? " saving" : text === "Unsaved" ? " unsaved" : "");
+  },
+  showBanner(msg) { const b = document.getElementById("banner"); b.textContent = msg; b.style.display = "block"; },
+  hideBanner() { document.getElementById("banner").style.display = "none"; },
+  toast(msg) {
+    const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 2200);
+  },
+  _offerReopen(handle) {
+    const btn = document.getElementById("restoreBtn");
+    btn.textContent = "Reopen " + (handle.name || "last folder");
+    btn.style.display = "";
+    btn.onclick = async () => {
+      try {
+        if (await Storage.verifyPermission(handle, true)) {
+          btn.style.display = "none";
+          await App.useRoot(handle);
+        }
+      } catch (e) { App.toast("Couldn't reopen folder"); }
+    };
+  },
+};
+
+App.selectNotebook = async function (id) {
+  await App.flushPending();
+  App.sel.notebookId = id;
+  const nb = findNotebook(App.index, id);
+  App.sel.sectionId = nb && nb.sections[0] ? nb.sections[0].id : null;
+  const sec = findSection(App.index, id, App.sel.sectionId);
+  App.sel.pageId = sec && sec.pages[0] ? sec.pages[0].id : null;
+  App.afterSelectionChange();
+};
+App.selectSection = async function (id) {
+  await App.flushPending();
+  App.sel.sectionId = id;
+  const sec = findSection(App.index, App.sel.notebookId, id);
+  App.sel.pageId = sec && sec.pages[0] ? sec.pages[0].id : null;
+  App.afterSelectionChange();
+};
+App.selectPage = async function (id) {
+  await App.flushPending();
+  App.sel.pageId = id;
+  App.afterSelectionChange();
+};
+App.afterSelectionChange = async function () {
+  await App.loadCurrentPageIntoEditor();
+  View.render(App);
+};
+App.loadCurrentPageIntoEditor = async function () {
+  const pg = findPage(App.index, App.sel.notebookId, App.sel.sectionId, App.sel.pageId);
+  if (!pg || !App.root) { Blocks.clear(); return; }
+  try { Blocks.load(await Storage.readFile(App.root, pg.path)); }
+  catch (e) { Blocks.load(""); } // missing file -> empty canvas
+};
+
+App.onAddNotebook = async function () {
+  if (!App.requireRoot()) return;
+  const name = window.prompt("Notebook name:", "New Notebook");
+  if (!name || !name.trim()) return;
+  const nb = addNotebook(App.index, name.trim());
+  App.sel = { notebookId: nb.id, sectionId: null, pageId: null };
+  await App.persistIndex();
+  await App.afterSelectionChange();
+};
+App.onAddSection = async function () {
+  if (!App.requireRoot()) return;
+  if (!App.sel.notebookId) { App.toast("Select a notebook first"); return; }
+  const name = window.prompt("Section name:", "New Section");
+  if (!name || !name.trim()) return;
+  const sec = addSection(App.index, App.sel.notebookId, name.trim());
+  App.sel.sectionId = sec.id; App.sel.pageId = null;
+  await App.persistIndex();
+  await App.afterSelectionChange();
+};
+App.onAddPage = async function () {
+  if (!App.requireRoot()) return;
+  if (!App.sel.sectionId) { App.toast("Select a section first"); return; }
+  const name = window.prompt("Page title:", "New Page");
+  if (!name || !name.trim()) return;
+  const pg = addPage(App.index, App.sel.notebookId, App.sel.sectionId, name.trim());
+  App.sel.pageId = pg.id;
+  await App.safeWrite(() => Storage.writeFile(App.root, pg.path, "")); // create empty file
+  await App.persistIndex();
+  await App.afterSelectionChange();
+};
+
+App.renameNotebookUI = async function (id, newTitle) { await App.renameWithMove(() => renameNotebook(App.index, id, newTitle)); };
+App.renameSectionUI = async function (id, newTitle) { await App.renameWithMove(() => renameSection(App.index, App.sel.notebookId, id, newTitle)); };
+App.renamePageUI = async function (id, newTitle) { await App.renameWithMove(() => renamePage(App.index, App.sel.notebookId, App.sel.sectionId, id, newTitle)); };
+
+App.renameWithMove = async function (mutate) {
+  if (!App.requireRoot()) return;
+  await App.flushPending();
+  const before = collectPagePaths(App.index);
+  mutate();
+  const after = collectPagePaths(App.index);
+  const changes = diffPaths(before, after);
+  await App.safeWrite(async () => {
+    for (const c of changes) await Storage.movePage(App.root, c.from, c.to);
+  });
+  await App.persistIndex();
+  await App.afterSelectionChange();
+};
+
+App.deleteNotebookUI = async function (id) {
+  if (!App.requireRoot()) return;
+  await App.flushPending();
+  const nb = findNotebook(App.index, id);
+  const slug = nb ? nb.slug : null;
+  deleteNotebook(App.index, id);
+  if (slug) await App.safeWrite(() => Storage.removeDir(App.root, slug).catch(() => {}));
+  if (App.sel.notebookId === id) App.sel = { notebookId: null, sectionId: null, pageId: null };
+  await App.persistIndex();
+  await App.afterSelectionChange();
+};
+App.deleteSectionUI = async function (id) {
+  if (!App.requireRoot()) return;
+  await App.flushPending();
+  const nb = findNotebook(App.index, App.sel.notebookId);
+  const sec = nb ? nb.sections.find(s => s.id === id) : null;
+  const dir = nb && sec ? (nb.slug + "/" + sec.slug) : null;
+  deleteSection(App.index, App.sel.notebookId, id);
+  if (dir) await App.safeWrite(() => Storage.removeDir(App.root, dir).catch(() => {}));
+  if (App.sel.sectionId === id) { App.sel.sectionId = null; App.sel.pageId = null; }
+  await App.persistIndex();
+  await App.afterSelectionChange();
+};
+App.deletePageUI = async function (id) {
+  if (!App.requireRoot()) return;
+  await App.flushPending();
+  const pg = findPage(App.index, App.sel.notebookId, App.sel.sectionId, id);
+  const path = pg ? pg.path : null;
+  deletePage(App.index, App.sel.notebookId, App.sel.sectionId, id);
+  if (path) await App.safeWrite(() => Storage.deleteFile(App.root, path).catch(() => {}));
+  if (App.sel.pageId === id) App.sel.pageId = null;
+  await App.persistIndex();
+  await App.afterSelectionChange();
+};
+
+App.onTitleEdit = function () {
+  const pg = findPage(App.index, App.sel.notebookId, App.sel.sectionId, App.sel.pageId);
+  if (!pg) return;
+  const v = document.getElementById("pageTitle").value.trim();
+  if (v && v !== pg.title) App.renamePageUI(pg.id, v);
+};
+
+App.requireRoot = function () {
+  if (!App.root) { App.toast("Open a notes folder first"); return false; }
+  return true;
+};
+
+// ---- cross-content search (title + page text), jump-to-match with counter ----
+App._searchQ = null;     // the query the current _matches were computed for
+App._matches = [];       // [{notebookId, sectionId, pageId}] in document order
+App._matchIdx = 0;
+App._searchSeq = 0;      // epoch guard against overlapping async searches
+
+App.runSearch = async function () {
+  if (!App.root) return;
+  const q = document.getElementById("search").value.trim().toLowerCase();
+  if (!q) { App._clearSearch(); return; }
+  await App.flushPending();              // persist current edits before searching + navigating
+  const seq = ++App._searchSeq;
+  if (q !== App._searchQ) {
+    const matches = await App._collectMatches(q);
+    if (seq !== App._searchSeq) return;  // a newer search superseded this one
+    App._searchQ = q;
+    App._matches = matches;
+    App._matchIdx = 0;
+  } else if (App._matches.length) {
+    App._matchIdx = (App._matchIdx + 1) % App._matches.length;   // Enter again -> next
+  }
+  App._updateCount();
+  if (App._matches.length) await App._gotoMatch(App._matches[App._matchIdx], q);
+};
+
+App._collectMatches = async function (q) {
+  const res = [];
+  for (const nb of App.index.notebooks)
+    for (const sec of nb.sections)
+      for (const pg of sec.pages) {
+        let html = "";
+        try { html = await Storage.readFile(App.root, pg.path); } catch (e) { html = ""; }
+        if (pageMatches(pg.title, html, q))
+          res.push({ notebookId: nb.id, sectionId: sec.id, pageId: pg.id });
+      }
+  return res;
+};
+
+App._gotoMatch = async function (m, q) {
+  App._clearHighlight();
+  App.sel = { notebookId: m.notebookId, sectionId: m.sectionId, pageId: m.pageId };
+  await App.afterSelectionChange();   // loads the page into the canvas + renders
+  App._highlight(q);
+};
+
+App._updateCount = function () {
+  const el = document.getElementById("searchCount");
+  if (!el) return;
+  if (!App._searchQ) { el.textContent = ""; return; }
+  const n = App._matches.length;
+  el.textContent = n ? (App._matchIdx + 1) + "/" + n : "0/0";
+};
+
+App._clearSearch = function () {
+  App._searchQ = null; App._matches = []; App._matchIdx = 0;
+  App._clearHighlight();
+  App._updateCount();
+};
+
+App._highlight = function (q) {
+  App._clearHighlight();
+  if (!q || typeof Highlight === "undefined" || !window.CSS || !CSS.highlights) return;
+  const root = document.getElementById("canvas");
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+  const ranges = [];
+  let node;
+  while ((node = walker.nextNode())) {
+    const hay = node.nodeValue.toLowerCase();
+    let i = hay.indexOf(q);
+    while (i !== -1) {
+      const r = document.createRange();
+      r.setStart(node, i); r.setEnd(node, i + q.length);
+      ranges.push(r);
+      i = hay.indexOf(q, i + q.length);
+    }
+  }
+  if (ranges.length) {
+    CSS.highlights.set("search-hl", new Highlight(...ranges));
+    const host = ranges[0].startContainer.parentElement;
+    if (host && host.scrollIntoView) host.scrollIntoView({ block: "center", inline: "nearest" });
+  }
+};
+
+App._clearHighlight = function () {
+  if (window.CSS && CSS.highlights) CSS.highlights.delete("search-hl");
+};
+
+App.checkForUpdates = async function () {
+  const el = document.getElementById("updateStatus");
+  if (!el) return;
+  if (!UPDATE_CHECK_URL) { el.textContent = ""; return; }   // not configured yet
+  el.textContent = "Checking for updates…";
+  try {
+    const resp = await fetch(UPDATE_CHECK_URL, { cache: "no-store" });
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const latest = parseLatestVersion(await resp.text());
+    if (!latest) { el.textContent = "Update check unavailable"; return; }
+    el.textContent = compareVersions(latest, APP_VERSION) > 0 ? "Not running latest version" : "Up To Date";
+  } catch (e) {
+    el.textContent = "Update check unavailable";
+  }
+};
+
+App._pageSaveTimer = null;
+App._pendingPageId = null;
+
+App.onEditorChange = function () {
+  const pg = findPage(App.index, App.sel.notebookId, App.sel.sectionId, App.sel.pageId);
+  if (!pg || !App.root) return;
+  App._pendingPageId = pg.id;
+  App.setStatus("Unsaved");
+  clearTimeout(App._pageSaveTimer);
+  App._pageSaveTimer = setTimeout(() => App.savePage(pg), 800);
+};
+
+App.savePage = async function (pg) {
+  if (!App.root || !pg) return;
+  // Bail if the page was deleted since the save was scheduled.
+  let stillExists = false;
+  for (const nb of App.index.notebooks)
+    for (const sec of nb.sections)
+      for (const p of sec.pages)
+        if (p.id === pg.id) stillExists = true;
+  if (!stillExists) return;
+  const path = pg.path;
+  const html = Blocks.serialize();
+  App.setStatus("Saving…");
+  const ok = await App.safeWrite(async () => {
+    await Storage.writeFile(App.root, path, html);
+    pg.modified = nowISO();
+    await Storage.writeIndex(App.root, App.index);
+  });
+  if (ok) App.setStatus("Saved");
+};
+
+App.flushPending = async function () {
+  if (!App._pendingPageId) return;
+  clearTimeout(App._pageSaveTimer);
+  const id = App._pendingPageId;
+  App._pendingPageId = null;
+  let pg = null;
+  for (const nb of App.index.notebooks)
+    for (const sec of nb.sections)
+      for (const p of sec.pages)
+        if (p.id === id) pg = p;
+  if (pg) await App.savePage(pg);
+};
+
+App.persistIndex = async function () {
+  if (!App.root) return;
+  await App.safeWrite(() => Storage.writeIndex(App.root, App.index));
+};
+
+App.safeWrite = async function (fn) {
+  try { await fn(); return true; }
+  catch (e) {
+    App.setStatus("Unsaved");
+    App.toast("Save failed: " + (e && e.message ? e.message : e));
+    return false;
+  }
+};
+
+// ===== TESTS =====
+const TESTS = [];
+function test(name, fn) { TESTS.push({ name: name, fn: fn }); }
+function assert(cond, msg) { if (!cond) throw new Error(msg || "assertion failed"); }
+function assertEqual(got, expected, msg) {
+  const g = JSON.stringify(got), e = JSON.stringify(expected);
+  if (g !== e) throw new Error((msg ? msg + " — " : "") + "expected " + e + " but got " + g);
+}
+function assertThrows(fn, msg) {
+  let threw = false;
+  try { fn(); } catch (e) { threw = true; }
+  if (!threw) throw new Error(msg || "expected function to throw");
+}
+
+// Task 2: slugify tests
+test("slugify lowercases and dashes spaces", () => assertEqual(slugify("Meeting Notes"), "meeting-notes"));
+test("slugify strips punctuation", () => assertEqual(slugify("Q3 / Plan!!"), "q3-plan"));
+test("slugify collapses and trims dashes", () => assertEqual(slugify("  a   b  "), "a-b"));
+test("slugify empty falls back to untitled", () => assertEqual(slugify("   "), "untitled"));
+test("slugify non-string is handled", () => assertEqual(slugify(123), "123"));
+
+// Task 3: uniqueSlug, genId, nowISO tests
+test("uniqueSlug returns base when free", () => assertEqual(uniqueSlug("notes", []), "notes"));
+test("uniqueSlug returns base when not taken", () => assertEqual(uniqueSlug("notes", ["work", "ideas"]), "notes"));
+test("uniqueSlug appends -2 on collision", () => assertEqual(uniqueSlug("notes", ["notes"]), "notes-2"));
+test("uniqueSlug skips to next free suffix", () => assertEqual(uniqueSlug("notes", ["notes", "notes-2", "notes-3"]), "notes-4"));
+test("genId has prefix and is non-empty", () => { const id = genId("nb"); assert(id.indexOf("nb_") === 0 && id.length > 3, id); });
+test("genId is unique-ish", () => assert(genId("x") !== genId("x")));
+test("nowISO returns ISO string", () => assert(/^\d{4}-\d\d-\d\dT/.test(nowISO())));
+
+// Task 10: escapeHtml test
+test("escapeHtml escapes angle brackets and quotes", () =>
+  assertEqual(escapeHtml('<a title="x">&'), "&lt;a title=&quot;x&quot;&gt;&amp;"));
+
+// Task 5: Model — find helpers + add operations
+test("addNotebook creates with slug/order", () => {
+  const idx = emptyIndex();
+  const nb = addNotebook(idx, "My Work");
+  assertEqual(nb.title, "My Work");
+  assertEqual(nb.slug, "my-work");
+  assertEqual(nb.order, 0);
+  assertEqual(nb.sections, []);
+  assert(nb.id.indexOf("nb_") === 0);
+  assertEqual(idx.notebooks.length, 1);
+});
+test("addNotebook dedupes slugs", () => {
+  const idx = emptyIndex();
+  addNotebook(idx, "Work"); const b = addNotebook(idx, "Work");
+  assertEqual(b.slug, "work-2");
+  assertEqual(b.order, 1);
+});
+test("addSection under notebook", () => {
+  const idx = emptyIndex(); const nb = addNotebook(idx, "Work");
+  const sec = addSection(idx, nb.id, "Notes");
+  assertEqual(sec.slug, "notes");
+  assertEqual(sec.pages, []);
+  assertEqual(nb.sections.length, 1);
+});
+test("addSection throws on missing notebook", () => assertThrows(() => addSection(emptyIndex(), "nope", "X")));
+test("addPage sets path from slugs", () => {
+  const idx = emptyIndex(); const nb = addNotebook(idx, "Work"); const sec = addSection(idx, nb.id, "Notes");
+  const pg = addPage(idx, nb.id, sec.id, "Meeting Notes");
+  assertEqual(pg.slug, "meeting-notes");
+  assertEqual(pg.path, "work/notes/meeting-notes.html");
+  assert(typeof pg.created === "string" && typeof pg.modified === "string");
+});
+test("addPage throws on missing section", () => {
+  const idx = emptyIndex(); const nb = addNotebook(idx, "Work");
+  assertThrows(() => addPage(idx, nb.id, "nope", "X"));
+});
+test("findNotebook/Section/Page", () => {
+  const idx = emptyIndex(); const nb = addNotebook(idx, "Work"); const sec = addSection(idx, nb.id, "Notes");
+  const pg = addPage(idx, nb.id, sec.id, "P1");
+  assertEqual(findNotebook(idx, nb.id).id, nb.id);
+  assertEqual(findSection(idx, nb.id, sec.id).id, sec.id);
+  assertEqual(findPage(idx, nb.id, sec.id, pg.id).id, pg.id);
+  assertEqual(findNotebook(idx, "x"), null);
+});
+
+// Task 6: Model — path recomputation + diff helpers
+test("recomputePaths rebuilds all page paths", () => {
+  const idx = emptyIndex(); const nb = addNotebook(idx, "Work"); const sec = addSection(idx, nb.id, "Notes");
+  const pg = addPage(idx, nb.id, sec.id, "P1");
+  nb.slug = "renamed";
+  recomputePaths(idx);
+  assertEqual(pg.path, "renamed/notes/p1.html");
+});
+test("collectPagePaths maps id to path", () => {
+  const idx = emptyIndex(); const nb = addNotebook(idx, "Work"); const sec = addSection(idx, nb.id, "Notes");
+  const pg = addPage(idx, nb.id, sec.id, "P1");
+  const map = collectPagePaths(idx);
+  assertEqual(map[pg.id], "work/notes/p1.html");
+});
+test("diffPaths reports changed paths only", () => {
+  const before = { a: "x/1.html", b: "y/2.html" };
+  const after = { a: "x/1.html", b: "z/2.html" };
+  assertEqual(diffPaths(before, after), [{ id: "b", from: "y/2.html", to: "z/2.html" }]);
+});
+test("diffPaths ignores new ids", () => {
+  assertEqual(diffPaths({ a: "1" }, { a: "1", b: "2" }), []);
+});
+
+// Task 7: Model — rename operations
+test("renameNotebook updates title, slug, and descendant paths", () => {
+  const idx = emptyIndex(); const nb = addNotebook(idx, "Work"); const sec = addSection(idx, nb.id, "Notes");
+  const pg = addPage(idx, nb.id, sec.id, "P1");
+  renameNotebook(idx, nb.id, "Personal");
+  assertEqual(nb.title, "Personal");
+  assertEqual(nb.slug, "personal");
+  assertEqual(pg.path, "personal/notes/p1.html");
+});
+test("renameNotebook dedupes against siblings", () => {
+  const idx = emptyIndex(); addNotebook(idx, "Home"); const b = addNotebook(idx, "Work");
+  renameNotebook(idx, b.id, "Home");
+  assertEqual(b.slug, "home-2");
+});
+test("renameSection updates slug and page paths", () => {
+  const idx = emptyIndex(); const nb = addNotebook(idx, "Work"); const sec = addSection(idx, nb.id, "Notes");
+  const pg = addPage(idx, nb.id, sec.id, "P1");
+  renameSection(idx, nb.id, sec.id, "Tasks");
+  assertEqual(sec.slug, "tasks");
+  assertEqual(pg.path, "work/tasks/p1.html");
+});
+test("renamePage updates slug, path, modified", () => {
+  const idx = emptyIndex(); const nb = addNotebook(idx, "Work"); const sec = addSection(idx, nb.id, "Notes");
+  const pg = addPage(idx, nb.id, sec.id, "P1"); const oldMod = pg.modified;
+  renamePage(idx, nb.id, sec.id, pg.id, "Renamed Page");
+  assertEqual(pg.slug, "renamed-page");
+  assertEqual(pg.path, "work/notes/renamed-page.html");
+  assert(typeof pg.modified === "string");
+});
+test("renameNotebook throws on missing", () => assertThrows(() => renameNotebook(emptyIndex(), "x", "Y")));
+
+// Task 8: Model — delete operations
+test("deletePage removes and returns it", () => {
+  const idx = emptyIndex(); const nb = addNotebook(idx, "W"); const sec = addSection(idx, nb.id, "N");
+  const pg = addPage(idx, nb.id, sec.id, "P1");
+  const removed = deletePage(idx, nb.id, sec.id, pg.id);
+  assertEqual(removed.id, pg.id);
+  assertEqual(sec.pages.length, 0);
+});
+test("deleteSection removes it", () => {
+  const idx = emptyIndex(); const nb = addNotebook(idx, "W"); const sec = addSection(idx, nb.id, "N");
+  deleteSection(idx, nb.id, sec.id);
+  assertEqual(nb.sections.length, 0);
+});
+test("deleteNotebook removes it", () => {
+  const idx = emptyIndex(); const nb = addNotebook(idx, "W");
+  deleteNotebook(idx, nb.id);
+  assertEqual(idx.notebooks.length, 0);
+});
+test("deletePage throws on missing", () => {
+  const idx = emptyIndex(); const nb = addNotebook(idx, "W"); const sec = addSection(idx, nb.id, "N");
+  assertThrows(() => deletePage(idx, nb.id, sec.id, "x"));
+});
+
+// Task 4: Index serialization tests
+test("emptyIndex shape", () => assertEqual(emptyIndex(), { version: 1, notebooks: [] }));
+test("serializeIndex is pretty JSON", () => {
+  const s = serializeIndex(emptyIndex());
+  assert(s.indexOf('"version": 1') !== -1, s);
+  assert(s.indexOf("\n") !== -1, "should be multi-line");
+});
+test("validateIndex accepts good", () => assert(validateIndex({ version: 1, notebooks: [] }) === true));
+test("validateIndex rejects bad version", () => assert(validateIndex({ version: 2, notebooks: [] }) === false));
+test("validateIndex rejects missing notebooks", () => assert(validateIndex({ version: 1 }) === false));
+test("validateIndex rejects null", () => assert(validateIndex(null) === false));
+test("parseIndex round-trips", () => {
+  const idx = { version: 1, notebooks: [{ id: "nb_1", title: "Work", slug: "work", order: 0, sections: [] }] };
+  assertEqual(parseIndex(serializeIndex(idx)), idx);
+});
+test("parseIndex throws on invalid json", () => assertThrows(() => parseIndex("{not json")));
+test("parseIndex throws on wrong shape", () => assertThrows(() => parseIndex('{"foo":1}')));
+
+// Task 9: Search — filterPagesByTitle tests
+function _fixtureIndex() {
+  const idx = emptyIndex();
+  const nb = addNotebook(idx, "Work"); const sec = addSection(idx, nb.id, "Notes");
+  addPage(idx, nb.id, sec.id, "Budget Review");
+  addPage(idx, nb.id, sec.id, "Team Meeting");
+  return { idx, nb, sec };
+}
+test("filterPagesByTitle empty returns all", () => {
+  const f = _fixtureIndex();
+  assertEqual(filterPagesByTitle(f.idx, "").length, 2);
+});
+test("filterPagesByTitle matches case-insensitively", () => {
+  const f = _fixtureIndex();
+  const r = filterPagesByTitle(f.idx, "MEETING");
+  assertEqual(r.length, 1);
+  assertEqual(r[0].page.title, "Team Meeting");
+  assertEqual(r[0].notebookId, f.nb.id);
+  assertEqual(r[0].sectionId, f.sec.id);
+});
+test("filterPagesByTitle no match returns empty", () => {
+  const f = _fixtureIndex();
+  assertEqual(filterPagesByTitle(f.idx, "zzz").length, 0);
+});
+test("pageMatches matches the title", () => assert(pageMatches("Budget Plan", "", "budget") === true));
+test("pageMatches matches the page content text", () =>
+  assert(pageMatches("X", '<div class="block" data-type="text"><p>hello world</p></div>', "world") === true));
+test("pageMatches is case-insensitive", () => assert(pageMatches("X", "<p>Foo BAR</p>", "bar") === true));
+test("pageMatches returns false with no match", () => assert(pageMatches("X", "<p>abc</p>", "zzz") === false));
+test("pageMatches ignores HTML tags/attributes", () => assert(pageMatches("X", '<p style="color:red">hi</p>', "color") === false));
+test("pageMatches empty query is false", () => assert(pageMatches("anything", "<p>x</p>", "") === false));
+test("parseLatestVersion reads a plain version string", () => assertEqual(parseLatestVersion("1.2.3"), "1.2.3"));
+test("parseLatestVersion strips a leading v and whitespace", () => assertEqual(parseLatestVersion(" v1.2.3 \n"), "1.2.3"));
+test("parseLatestVersion reads tag_name from releases JSON", () => assertEqual(parseLatestVersion('{"tag_name":"v2.0.1"}'), "2.0.1"));
+test("parseLatestVersion reads first item of a JSON array", () => assertEqual(parseLatestVersion('[{"tag_name":"v3.4"}]'), "3.4"));
+test("parseLatestVersion finds a version embedded in text", () => assertEqual(parseLatestVersion("Latest release: 1.5"), "1.5"));
+test("parseLatestVersion returns null when no version present", () => assertEqual(parseLatestVersion("no digits here"), null));
+test("compareVersions equal", () => assert(compareVersions("1.0.0", "1.0.0") === 0));
+test("compareVersions remote newer", () => assert(compareVersions("1.1.0", "1.0.0") === 1));
+test("compareVersions remote older", () => assert(compareVersions("1.0.0", "1.2.0") === -1));
+test("compareVersions tolerates differing lengths", () => {
+  assert(compareVersions("1.0", "1.0.0") === 0);
+  assert(compareVersions("1.0.1", "1.0") === 1);
+});
+
+test("clampResize clamps to canvas bounds", () => {
+  const r = clampResize({x:700,y:550,w:80,h:48}, [], 999, 999, 800, 600);
+  assertEqual(r, {w:100, h:50});
+});
+test("clampResize enforces minimum size", () => {
+  const r = clampResize({x:0,y:0,w:200,h:200}, [], 10, 10, 800, 600);
+  assertEqual(r, {w:80, h:48});
+});
+test("clampResize stops at a neighbour to the right", () => {
+  const others = [{x:300,y:0,w:100,h:200}];
+  const r = clampResize({x:0,y:0,w:100,h:100}, others, 500, 100, 800, 600);
+  assertEqual(r, {w:300, h:100});
+});
+test("clampResize stops at a neighbour below", () => {
+  const others = [{x:0,y:250,w:200,h:100}];
+  const r = clampResize({x:0,y:0,w:100,h:100}, others, 100, 500, 800, 600);
+  assertEqual(r, {w:100, h:250});
+});
+
+test("resolveDrag free move commits candidate", () => {
+  const r = resolveDrag({x:0,y:0,w:50,h:50}, [], {x:100,y:120}, 800, 600);
+  assertEqual(r, {x:100, y:120});
+});
+test("resolveDrag clamps to canvas bounds", () => {
+  const r = resolveDrag({x:0,y:0,w:50,h:50}, [], {x:1000,y:-30}, 800, 600);
+  assertEqual(r, {x:750, y:0});
+});
+test("resolveDrag slides on Y when X blocked", () => {
+  // moving at (0,0) 50x50; other occupies x:60.. ; candidate tries to go right into it but down is free
+  const others = [{x:60,y:0,w:100,h:100}];
+  const r = resolveDrag({x:0,y:0,w:50,h:50}, others, {x:65,y:200}, 800, 600);
+  assertEqual(r, {x:0, y:200});
+});
+test("nearestFreeSpot returns desired position when free", () =>
+  assertEqual(nearestFreeSpot({x:100,y:100,w:50,h:50}, [], 800, 600), {x:100,y:100}));
+test("nearestFreeSpot clamps a free desired position to bounds", () =>
+  assertEqual(nearestFreeSpot({x:1000,y:-20,w:50,h:50}, [], 800, 600), {x:750,y:0}));
+test("nearestFreeSpot moves a dropped block off an overlapping neighbour", () => {
+  const others = [{x:100,y:100,w:100,h:100}];
+  const r = nearestFreeSpot({x:120,y:120,w:50,h:50}, others, 800, 600);
+  assert(!rectsOverlap({x:r.x,y:r.y,w:50,h:50}, others[0]), "should not overlap: " + JSON.stringify(r));
+  assert(r.x>=0 && r.y>=0 && r.x<=750 && r.y<=550, "in bounds: " + JSON.stringify(r));
+});
+test("resolveDrag fully blocked keeps prior position", () => {
+  const others = [{x:40,y:0,w:100,h:300}, {x:0,y:40,w:300,h:100}];
+  const r = resolveDrag({x:0,y:0,w:50,h:50}, others, {x:45,y:45}, 800, 600);
+  assertEqual(r, {x:0, y:0});
+});
+
+test("serializePage emits text and image blocks", () => {
+  const html = serializePage([
+    {type:"text", x:24, y:24, w:300, h:120, content:"<p>hi</p>"},
+    {type:"image", x:50, y:200, w:160, h:90, content:"data:image/png;base64,AAA"}
+  ]);
+  assert(html.indexOf('data-type="text"') !== -1, html);
+  assert(html.indexOf('left:24px') !== -1 && html.indexOf('width:300px') !== -1, html);
+  assert(html.indexOf('data-type="image"') !== -1, html);
+  assert(html.indexOf('<img src="data:image/png;base64,AAA">') !== -1, html);
+});
+test("parsePage reads blocks back", () => {
+  const blocks = parsePage(
+    '<div class="block" data-type="text" style="left:10px;top:20px;width:300px;height:120px;"><p>hi</p></div>' +
+    '<div class="block" data-type="image" style="left:50px;top:200px;width:160px;height:90px;"><img src="data:image/png;base64,AAA"></div>');
+  assertEqual(blocks.length, 2);
+  assertEqual(blocks[0], {type:"text", x:10, y:20, w:300, h:120, content:"<p>hi</p>"});
+  assertEqual(blocks[1], {type:"image", x:50, y:200, w:160, h:90, content:"data:image/png;base64,AAA", drawing:"", caption:""});
+});
+test("parsePage image without svg/caption yields empty drawing+caption (old block migration)", () => {
+  const blocks = parsePage('<div class="block" data-type="image" style="left:0px;top:0px;width:100px;height:80px;"><img src="data:x"></div>');
+  assertEqual(blocks[0], {type:"image", x:0, y:0, w:100, h:80, content:"data:x", drawing:"", caption:""});
+});
+test("parsePage round-trips an image with caption + drawing", () => {
+  const orig = [{type:"image", x:10, y:20, w:200, h:140, content:"data:img",
+    drawing:'<path d="M10 10L90 90" stroke="#e0697a" stroke-width="3" fill="none" vector-effect="non-scaling-stroke" stroke-linecap="round"></path>',
+    caption:"a <b>note</b>"}];
+  assertEqual(parsePage(serializePage(orig)), orig);
+});
+test("parsePage round-trips serializePage", () => {
+  const orig = [
+    {type:"text", x:24, y:24, w:300, h:120, content:"<b>x</b>"},
+    {type:"image", x:80, y:200, w:160, h:90, content:"data:image/png;base64,ZZ", drawing:"", caption:""}
+  ];
+  assertEqual(parsePage(serializePage(orig)), orig);
+});
+test("parsePage migrates a v1 page into one text block", () => {
+  const blocks = parsePage("<p>old v1 note <b>body</b></p>");
+  assertEqual(blocks.length, 1);
+  assertEqual(blocks[0].type, "text");
+  assertEqual(blocks[0].x, 24);
+  assertEqual(blocks[0].y, 24);
+  assertEqual(blocks[0].w, 720);
+  assertEqual(blocks[0].h, 300);
+  assert(blocks[0].content.indexOf("old v1 note") !== -1, blocks[0].content);
+});
+test("parsePage empty body yields no blocks", () => {
+  assertEqual(parsePage(""), []);
+  assertEqual(parsePage("   \n  "), []);
+});
+
+test("rectsOverlap true when overlapping", () =>
+  assert(rectsOverlap({x:0,y:0,w:100,h:100}, {x:50,y:50,w:100,h:100}) === true));
+test("rectsOverlap false when disjoint", () =>
+  assert(rectsOverlap({x:0,y:0,w:50,h:50}, {x:60,y:60,w:50,h:50}) === false));
+test("rectsOverlap false when edges touch", () =>
+  assert(rectsOverlap({x:0,y:0,w:50,h:50}, {x:50,y:0,w:50,h:50}) === false));
+test("rectsOverlap true when nested", () =>
+  assert(rectsOverlap({x:0,y:0,w:200,h:200}, {x:20,y:20,w:30,h:30}) === true));
+
+function runTests() {
+  let pass = 0, fail = 0; const lines = [];
+  for (const t of TESTS) {
+    try { t.fn(); pass++; lines.push("PASS  " + t.name); }
+    catch (e) { fail++; lines.push("FAIL  " + t.name + "\n        " + e.message); }
+  }
+  const el = document.getElementById("test-output");
+  el.textContent = "Tests: " + pass + " passed, " + fail + " failed\n\n" + lines.join("\n");
+  el.className = fail ? "tests-fail" : "tests-pass";
+}
+
+// ===== BOOT =====
+(function boot() {
+  const params = new URLSearchParams(location.search);
+  if (params.get("test")) {
+    document.getElementById("app").style.display = "none";
+    document.getElementById("test-output").style.display = "block";
+    runTests();
+  } else {
+    App.init();
+  }
+})();
+</script>
+</body>
+</html>
