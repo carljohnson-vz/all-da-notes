@@ -163,10 +163,10 @@
 
 // ===== VERSION / UPDATE CHECK =====
 const APP_VERSION = "1.0.0";
-// TODO: set to the GitHub URL that returns the latest version (raw text like "1.0.1",
-// or the releases API JSON e.g. https://api.github.com/repos/<owner>/<repo>/releases/latest).
-// Leave empty to disable the update check.
-const UPDATE_CHECK_URL = "";
+// Points at the VERSION file in the GitHub repo (raw). NOTE: raw.githubusercontent.com
+// only serves this without auth if the repo is PUBLIC; for a private repo the fetch 404s
+// and the footer shows "Update check unavailable". Leave empty to disable the check.
+const UPDATE_CHECK_URL = "https://raw.githubusercontent.com/carljohnson-vz/all-da-notes/main/VERSION";
 
 // Extract a dotted version (e.g. "1.2.3") from raw text or a releases JSON payload.
 function parseLatestVersion(text) {
